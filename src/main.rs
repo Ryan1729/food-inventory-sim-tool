@@ -1,3 +1,7 @@
+mod types;
+use types::{Mode, Res, Spec};
+mod config;
+
 mod minimal {
     use std::io::Write;
 
@@ -22,21 +26,9 @@ mod minimal {
     }
 }
 
-#[derive(serde::Deserialize)]
-enum Mode {
-    Minimal,
-}
-
-#[derive(serde::Deserialize)]
-struct Spec {
-    mode: Mode,
-}
-
-type Res<A> = Result<A, Box<dyn std::error::Error>>;
-
 fn main() -> Res<()> {
     use Mode::*;
-    let spec: Spec = get_spec()?;
+    let spec: Spec = config::get_spec()?;
 
     let output = std::io::stdout();
 
@@ -47,13 +39,4 @@ fn main() -> Res<()> {
     }
 
     Ok(())
-}
-
-fn get_spec() -> Res<Spec> {
-    // TODO accept CLI args to indicate a config file to overwrite the default config
-    Ok(config::Config::builder()
-        .add_source(config::File::with_name("config").required(false))
-        .add_source(config::Environment::with_prefix("FIST"))
-        .build()?
-        .try_deserialize::<Spec>()?)
 }
