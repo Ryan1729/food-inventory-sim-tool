@@ -1,6 +1,7 @@
 #[derive(serde::Deserialize)]
 pub enum Mode {
     Minimal,
+    Basic,
 }
 
 #[derive(serde::Deserialize)]
