@@ -50,10 +50,30 @@ mod basic {
         shelf: Vec<Food>,
     }
 
+    fn simulate(study: &mut Shelf, event: Event) {
+        match event {
+            Event::Ate(kind, grams) => {
+                // TODO Consider handling this error case in a better way. Perhaps not simply returning early.
+                let index = study.shelf.iter().position(|f| f.kind == kind).unwrap();
+
+                // TODO Consider handling this error case in a better way. Perhaps not simply returning early.
+                // For example, maybe eating a random different food, and recording that happened, so we can
+                // use that as a marker of performance.
+                study.shelf[index].grams = study.shelf[index].grams.checked_sub(grams).unwrap();
+            },
+            Event::Bought(kind, grams) => {
+                study.shelf.push(Food{
+                    kind,
+                    grams,
+                });
+            }
+        }
+    }
+
     #[derive(Clone)]
     enum Event {
         Ate(Kind, Grams),
-        //Bought(Kind, Grams),
+        Bought(Kind, Grams),
     }
 
     pub fn run(_spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
@@ -62,23 +82,13 @@ mod basic {
         // TODO Generate random events
         // TODO Make food types definable in the config
 
-        study.shelf.push(Food{
-            kind: Kind::Jam,
-            grams: 300,
-        });
+        let mut events = vec![Event::Ate(Kind::Jam, 30); 10];
+        events.insert(0, Event::Bought(Kind::Jam, 300));
 
-        for event in vec![Event::Ate(Kind::Jam, 30); 10] {
+        for event in events {
             writeln!(w, "{:?}", study.shelf)?;
 
-            match event {
-                Event::Ate(kind, grams) => {
-                    // TODO Consider handling this error case in a better way. Perhaps not simply returning early.
-                    let index = study.shelf.iter().position(|f| f.kind == kind).unwrap();
-
-                    // TODO Consider handling this error case in a better way. Perhaps not simply returning early.
-                    study.shelf[index].grams = study.shelf[index].grams.checked_sub(grams).unwrap();
-                }
-            }
+            simulate(&mut study, event);
         }
 
         writeln!(w, "{:?}", study.shelf)?;
