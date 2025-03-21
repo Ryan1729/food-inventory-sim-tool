@@ -1,3 +1,4 @@
+mod xs;
 mod types;
 use types::{Mode, Res, Spec};
 mod config;
@@ -28,6 +29,7 @@ mod minimal {
 
 mod basic {
     use std::io::Write;
+    use crate::xs::{self, Xs};
     use crate::types::Spec;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -76,14 +78,37 @@ mod basic {
         Bought(Kind, Grams),
     }
 
+    impl Event {
+        fn from_rng(rng: &mut Xs) -> Self {
+            match xs::range(rng, 0..2) {
+                1 => Self::Bought(
+                    Kind::Jam,
+                    xs::range(rng, 0..(u16::MAX as u32) & u16::MAX as u32) as u16,
+                ),
+                _ => Self::Ate(
+                    Kind::Jam,
+                    xs::range(rng, 0..(u16::MAX as u32) & u16::MAX as u32) as u16,
+                ),
+            }
+        }
+    }
+
     pub fn run(_spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
         let mut study: Shelf = Shelf::default();
 
-        // TODO Generate random events
         // TODO Make food types definable in the config
+        // TODO Make seed definable in the config
 
-        let mut events = vec![Event::Ate(Kind::Jam, 30); 10];
-        events.insert(0, Event::Bought(Kind::Jam, 300));
+        let mut rng = xs::from_seed(<_>::default());
+
+        let event_count = xs::range(&mut rng, 10..16);
+
+        let mut events = Vec::with_capacity(event_count as usize);
+
+        events.push(Event::Bought(Kind::Jam, 300));
+        for _ in 1..event_count {
+            events.push(Event::from_rng(&mut rng));
+        }
 
         for event in events {
             writeln!(w, "{:?}", study.shelf)?;
