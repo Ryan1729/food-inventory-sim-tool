@@ -5,13 +5,17 @@ mod config;
 
 mod minimal {
     use std::io::Write;
+    use crate::types::Spec;
+    use crate::xs;
 
     struct GummyBear;
 
     type Minimal = Option<GummyBear>;
 
-    pub fn run(mut w: impl Write) -> Result<(), std::io::Error> {
-        let mut study: Minimal = None;
+    pub fn run(spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
+        let mut rng = xs::from_seed(spec.seed.unwrap_or_default());
+
+        let mut study: Minimal = if xs::range(&mut rng, 0..2) > 0 { Some(GummyBear) } else { None };
 
         writeln!(w, "{}", study.is_some())?;
 
@@ -93,13 +97,12 @@ mod basic {
         }
     }
 
-    pub fn run(_spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
+    pub fn run(spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
         let mut study: Shelf = Shelf::default();
 
         // TODO Make food types definable in the config
-        // TODO Make seed definable in the config
 
-        let mut rng = xs::from_seed(<_>::default());
+        let mut rng = xs::from_seed(spec.seed.unwrap_or_default());
 
         let event_count = xs::range(&mut rng, 10..16);
 
@@ -130,7 +133,7 @@ fn main() -> Res<()> {
 
     match spec.mode {
         Minimal => {
-            minimal::run(&output)?;
+            minimal::run(&spec, &output)?;
         }
         Basic => {
             basic::run(&spec, &output)?;
