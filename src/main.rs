@@ -41,7 +41,7 @@ mod basic {
         Jam
     }
 
-    // 64k grams ouught to be enough for anybody!
+    // 64k grams ought to be enough for anybody!
     type Grams = u16;
 
     #[derive(Debug)]
@@ -54,18 +54,47 @@ mod basic {
     #[derive(Default)]
     struct Shelf {
         shelf: Vec<Food>,
+        out_count: Grams,
+        // 64k starvations ought to be enough for anybody!
+        starved_count: u16
     }
 
     fn simulate(study: &mut Shelf, event: Event) {
         match event {
             Event::Ate(kind, grams) => {
-                // TODO Consider handling this error case in a better way. Perhaps not simply returning early.
-                let index = study.shelf.iter().position(|f| f.kind == kind).unwrap();
+                fn eat_at(study: &mut Shelf, index: usize, grams: Grams) {
+                    if index >= study.shelf.len() {
+                        study.starved_count += 1;
+                        return
+                    }
+                    let food = &mut study.shelf[index];
+                    if let Some(subtracted) = food.grams.checked_sub(grams) {
+                        // Base case
+                        food.grams = subtracted;
+                    } else {
+                        let remaining_grams = grams - food.grams;
+                        study.out_count += remaining_grams;
+                        food.grams = 0;
 
-                // TODO Consider handling this error case in a better way. Perhaps not simply returning early.
-                // For example, maybe eating a random different food, and recording that happened, so we can
-                // use that as a marker of performance.
-                study.shelf[index].grams = study.shelf[index].grams.checked_sub(grams).unwrap();
+                        study.shelf.swap_remove(index);
+
+                        // TODO? Allow configuring this? Make random an option?
+                        let arbitrary_index = 0;
+
+                        eat_at(study, arbitrary_index, remaining_grams);
+                    }
+                }
+
+                if let Some(index) = study.shelf.iter().position(|f| f.kind == kind) {
+                    eat_at(study, index, grams);
+                } else {
+                    study.out_count += grams;
+
+                    // TODO? Allow configuring this? Make random an option?
+                    let arbitrary_index = 0;
+
+                    eat_at(study, arbitrary_index, grams);
+                }
             },
             Event::Bought(kind, grams) => {
                 study.shelf.push(Food{
