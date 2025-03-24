@@ -51,12 +51,19 @@ mod basic {
         // TODO expiry date. Or maybe in a different model
     }
 
-    #[derive(Default)]
-    struct Shelf {
-        shelf: Vec<Food>,
+    /// A snapshot of the data needed to evaluate the performance metric(s) of the given set of events.
+    /// That is, how well those events achieve some goal, not how long it took to simulate them.
+    #[derive(Clone, Copy, Debug, Default)]
+    struct PerfSnapshot {
         out_count: Grams,
         // 64k starvations ought to be enough for anybody!
         starved_count: u16
+    }
+
+    #[derive(Default)]
+    struct Shelf {
+        shelf: Vec<Food>,
+        perf: PerfSnapshot,
     }
 
     fn simulate(study: &mut Shelf, event: Event) {
@@ -64,7 +71,7 @@ mod basic {
             Event::Ate(kind, grams) => {
                 fn eat_at(study: &mut Shelf, index: usize, grams: Grams) {
                     if index >= study.shelf.len() {
-                        study.starved_count += 1;
+                        study.perf.starved_count += 1;
                         return
                     }
                     let food = &mut study.shelf[index];
@@ -73,7 +80,7 @@ mod basic {
                         food.grams = subtracted;
                     } else {
                         let remaining_grams = grams - food.grams;
-                        study.out_count += remaining_grams;
+                        study.perf.out_count += remaining_grams;
                         food.grams = 0;
 
                         study.shelf.swap_remove(index);
@@ -88,7 +95,7 @@ mod basic {
                 if let Some(index) = study.shelf.iter().position(|f| f.kind == kind) {
                     eat_at(study, index, grams);
                 } else {
-                    study.out_count += grams;
+                    study.perf.out_count += grams;
 
                     // TODO? Allow configuring this? Make random an option?
                     let arbitrary_index = 0;
@@ -103,6 +110,27 @@ mod basic {
                 });
             }
         }
+    }
+
+    #[derive(Debug, Default)]
+    struct Stats {
+        snapshot: PerfSnapshot,
+        total_items: usize,
+        total_grams: Grams,
+    }
+
+    fn stats(shelf: &Shelf) -> Stats {
+        let mut stats = Stats::default();
+
+        stats.snapshot = shelf.perf.clone();
+
+        for food in shelf.shelf.iter() {
+            stats.total_grams += food.grams;
+        }
+
+        stats.total_items = shelf.shelf.len();
+
+        stats
     }
 
     #[derive(Clone)]
@@ -137,18 +165,23 @@ mod basic {
 
         let mut events = Vec::with_capacity(event_count as usize);
 
+        // TODO Separate purchases from eating, and add concept of a day and fixed amount to eat per day
+        // TODO An actual reasonable purchase strategy
+        // TODO Make hunger models and purchase strategies configurable
         events.push(Event::Bought(Kind::Jam, 300));
         for _ in 1..event_count {
             events.push(Event::from_rng(&mut rng));
         }
 
+        let mut all_stats = Vec::with_capacity(events.len() + 1);
+
         for event in events {
-            writeln!(w, "{:?}", study.shelf)?;
+            all_stats.push(stats(&study));
 
             simulate(&mut study, event);
         }
 
-        writeln!(w, "{:?}", study.shelf)?;
+        writeln!(w, "{:#?},", all_stats)?;
 
         Ok(())
     }
