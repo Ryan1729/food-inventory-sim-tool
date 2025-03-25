@@ -34,21 +34,33 @@ mod minimal {
 mod basic {
     use std::io::Write;
     use crate::xs::{self, Xs};
-    use crate::types::Spec;
+    use crate::types::{FoodTypes, food::{self, Grams}, Spec};
 
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    enum Kind {
-        Jam
-    }
-
-    // 64k grams ought to be enough for anybody!
-    type Grams = u16;
-
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     struct Food {
-        kind: Kind,
+        key: food::Key,
         grams: Grams,
         // TODO expiry date. Or maybe in a different model
+    }
+
+    impl Food {
+        fn from_rng(food_types: &[food::Type], rng: &mut Xs) -> Self {
+            let index = xs::range(rng, 0..food_types.len() as u32) as usize;
+
+            let type_ = &food_types[index];
+
+            Self::from_rng_of_type(type_, rng)
+        }
+
+        fn from_rng_of_type(type_: &food::Type, rng: &mut Xs) -> Self {
+            let option_index = xs::range(rng, 0..type_.options.len() as u32) as usize;
+            let option = &type_.options[option_index];
+
+            Self {
+                key: type_.key.clone(),
+                grams: option.grams,
+            }
+        }
     }
 
     /// A snapshot of the data needed to evaluate the performance metric(s) of the given set of events.
@@ -68,7 +80,7 @@ mod basic {
 
     fn simulate(study: &mut Shelf, event: Event) {
         match event {
-            Event::Ate(kind, grams) => {
+            Event::Ate(Food { key, grams }) => {
                 fn eat_at(study: &mut Shelf, index: usize, grams: Grams) {
                     if index >= study.shelf.len() {
                         study.perf.starved_count += 1;
@@ -92,7 +104,7 @@ mod basic {
                     }
                 }
 
-                if let Some(index) = study.shelf.iter().position(|f| f.kind == kind) {
+                if let Some(index) = study.shelf.iter().position(|f| f.key == key) {
                     eat_at(study, index, grams);
                 } else {
                     study.perf.out_count += grams;
@@ -103,11 +115,8 @@ mod basic {
                     eat_at(study, arbitrary_index, grams);
                 }
             },
-            Event::Bought(kind, grams) => {
-                study.shelf.push(Food{
-                    kind,
-                    grams,
-                });
+            Event::Bought(food) => {
+                study.shelf.push(food);
             }
         }
     }
@@ -135,43 +144,51 @@ mod basic {
 
     #[derive(Clone)]
     enum Event {
-        Ate(Kind, Grams),
-        Bought(Kind, Grams),
+        Ate(Food),
+        Bought(Food),
     }
 
     impl Event {
-        fn from_rng(rng: &mut Xs) -> Self {
-            match xs::range(rng, 0..2) {
-                1 => Self::Bought(
-                    Kind::Jam,
-                    xs::range(rng, 0..(u16::MAX as u32) & u16::MAX as u32) as u16,
-                ),
-                _ => Self::Ate(
-                    Kind::Jam,
-                    xs::range(rng, 0..(u16::MAX as u32) & u16::MAX as u32) as u16,
-                ),
+        fn from_rng(food_types: &FoodTypes, rng: &mut Xs) -> Self {
+            match xs::range(rng, 0..2 as u32) {
+                1 => Self::Bought(Food::from_rng(food_types, rng)),
+                _ => Self::Ate(Food::from_rng(food_types, rng)),
             }
         }
     }
 
     pub fn run(spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
+        let food_types = match &spec.mode {
+            crate::Mode::Basic(crate::types::BasicExtras { food_types }) => {
+                food_types
+            },
+            _ => {
+                panic!("TODO get rid of this case?");
+            }
+        };
+
         let mut study: Shelf = Shelf::default();
 
         // TODO Make food types definable in the config
 
         let mut rng = xs::from_seed(spec.seed.unwrap_or_default());
 
-        let event_count = xs::range(&mut rng, 10..16);
+        let event_count = xs::range(&mut rng, 10..16) as usize;
 
-        let mut events = Vec::with_capacity(event_count as usize);
+        let mut events = Vec::with_capacity(event_count);
 
         // TODO Separate purchases from eating, and add concept of a day and fixed amount to eat per day
         // TODO An actual reasonable purchase strategy
         // TODO Make hunger models and purchase strategies configurable
-        events.push(Event::Bought(Kind::Jam, 300));
-        for _ in 1..event_count {
-            events.push(Event::from_rng(&mut rng));
+        let initial_buy_count = core::cmp::min(event_count, food_types.len());
+
+        for i in 0..initial_buy_count {
+            events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize], &mut rng)));
         }
+        for _ in initial_buy_count..event_count {
+            events.push(Event::from_rng(food_types, &mut rng));
+        }
+        assert_eq!(events.len(), event_count);
 
         let mut all_stats = Vec::with_capacity(events.len() + 1);
 
@@ -197,7 +214,7 @@ fn main() -> Res<()> {
         Minimal => {
             minimal::run(&spec, &output)?;
         }
-        Basic => {
+        Basic { .. } => {
             basic::run(&spec, &output)?;
         }
     }

@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 config = { version = "0.15.11", features=["ron"] }
 serde = "1.0.219"
+vec1 = { version = "1.12.1", features=["serde"] }
 xflags = "0.3.2"

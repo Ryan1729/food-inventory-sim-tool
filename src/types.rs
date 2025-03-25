@@ -1,10 +1,39 @@
+use vec1::Vec1;
+
+pub type FoodTypes = Vec1<food::Type>; 
+
+#[derive(serde::Deserialize)]
+pub struct BasicExtras {
+    pub food_types: FoodTypes,
+}
+
 #[derive(serde::Deserialize)]
 pub enum Mode {
     Minimal,
-    Basic,
+    Basic(BasicExtras),
 }
 
 pub type Seed = [u8; 16];
+
+pub mod food {
+    use super::*;
+
+    // 64k grams ought to be enough for anybody!
+    pub type Grams = u16;
+
+    pub type Key = String;
+
+    #[derive(serde::Deserialize)]
+    pub struct Option {
+        pub grams: Grams,
+    }
+
+    #[derive(serde::Deserialize)]
+    pub struct Type {
+        pub key: Key,
+        pub options: Vec1<Option>,
+    }
+}
 
 #[derive(serde::Deserialize)]
 pub struct Spec {
