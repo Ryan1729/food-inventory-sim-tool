@@ -169,8 +169,6 @@ mod basic {
 
         let mut study: Shelf = Shelf::default();
 
-        // TODO Make food types definable in the config
-
         let mut rng = xs::from_seed(spec.seed.unwrap_or_default());
 
         let event_count = xs::range(&mut rng, 10..16) as usize;

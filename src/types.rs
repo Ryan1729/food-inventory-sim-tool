@@ -2,13 +2,13 @@ use vec1::Vec1;
 
 pub type FoodTypes = Vec1<food::Type>; 
 
-#[derive(serde::Deserialize)]
 pub struct BasicExtras {
     pub food_types: FoodTypes,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Default)]
 pub enum Mode {
+    #[default]
     Minimal,
     Basic(BasicExtras),
 }
@@ -35,7 +35,7 @@ pub mod food {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Default)]
 pub struct Spec {
     pub mode: Mode,
     pub seed: Option<Seed>,
