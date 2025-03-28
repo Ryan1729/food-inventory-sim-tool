@@ -171,22 +171,58 @@ mod basic {
 
         let mut rng = xs::from_seed(spec.seed.unwrap_or_default());
 
-        let event_count = xs::range(&mut rng, 10..16) as usize;
+        let day_count = (xs::range(&mut rng, 1..2) * 7) as usize;
 
-        let mut events = Vec::with_capacity(event_count);
+        let mut events = Vec::with_capacity(day_count);
 
-        // TODO Separate purchases from eating, and add concept of a day and fixed amount to eat per day
+        // TODO explicit performance calculation
+        // TODO make "buying all the time" not the optimal strat buy adding costs to foods
+
         // TODO An actual reasonable purchase strategy
         // TODO Make hunger models and purchase strategies configurable
-        let initial_buy_count = core::cmp::min(event_count, food_types.len());
+        let initial_buy_count = food_types.len();
 
         for i in 0..initial_buy_count {
             events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize], &mut rng)));
         }
-        for _ in initial_buy_count..event_count {
-            events.push(Event::from_rng(food_types, &mut rng));
+
+        // Eat a given amount of food each day, and each evening go on 0 to 2 shopping trips.
+        let grams_per_day = 2000; // TODO? random range? Configurable
+        let grams_per_event = 400; // TODO? random range? Configurable
+        let shopping_buy_count = 3;
+
+        for _ in 0..day_count {
+            let mut grams_remaining = grams_per_event;
+            while grams_remaining > 0 {
+                let index = xs::range(&mut rng, 0..food_types.len() as u32) as usize;
+
+                let type_ = &food_types[index];
+
+                // TODO Define a serving on each food type, and eat say 1.5 to 2.5 of them each time
+                let amount = xs::range(&mut rng, 1..(grams_remaining + 1)) as Grams;
+
+                events.push(Event::Bought(Food{
+                    key: type_.key.clone(),
+                    grams: amount,
+                }));
+
+                grams_remaining = grams_remaining.saturating_sub(amount as _);
+            }
+
+            match xs::range(&mut rng, 0..4) {
+                0 => {
+                    // Go shopping
+                    // TODO Count grams and buy a set amount of grams insteam of an item count?
+                    for _ in 0..shopping_buy_count {
+                        events.push(Event::Bought(Food::from_rng(&food_types, &mut rng)));
+                    }
+                },
+                _ => {
+                    // Skip shopping
+                }
+            }
         }
-        assert_eq!(events.len(), event_count);
+        assert!(events.len() > food_types.len());
 
         let mut all_stats = Vec::with_capacity(events.len() + 1);
 
