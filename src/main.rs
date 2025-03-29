@@ -63,6 +63,8 @@ mod basic {
         }
     }
 
+    type Performance = u32;
+
     /// A snapshot of the data needed to evaluate the performance metric(s) of the given set of events.
     /// That is, how well those events achieve some goal, not how long it took to simulate them.
     #[derive(Clone, Copy, Debug, Default)]
@@ -70,6 +72,13 @@ mod basic {
         out_count: Grams,
         // 64k starvations ought to be enough for anybody!
         starved_count: u16
+    }
+
+    impl PerfSnapshot {
+        fn performance(&self) -> Performance {
+            // TODO make "buying all the time" not the optimal strat by adding costs to foods
+            self.starved_count as Performance * 1000 + self.out_count as Performance
+        }
     }
 
     #[derive(Default)]
@@ -175,9 +184,6 @@ mod basic {
 
         let mut events = Vec::with_capacity(day_count);
 
-        // TODO explicit performance calculation
-        // TODO make "buying all the time" not the optimal strat buy adding costs to foods
-
         // TODO An actual reasonable purchase strategy
         // TODO Make hunger models and purchase strategies configurable
         let initial_buy_count = food_types.len();
@@ -188,11 +194,10 @@ mod basic {
 
         // Eat a given amount of food each day, and each evening go on 0 to 2 shopping trips.
         let grams_per_day = 2000; // TODO? random range? Configurable
-        let grams_per_event = 400; // TODO? random range? Configurable
         let shopping_buy_count = 3;
 
         for _ in 0..day_count {
-            let mut grams_remaining = grams_per_event;
+            let mut grams_remaining = grams_per_day;
             while grams_remaining > 0 {
                 let index = xs::range(&mut rng, 0..food_types.len() as u32) as usize;
 
@@ -201,7 +206,7 @@ mod basic {
                 // TODO Define a serving on each food type, and eat say 1.5 to 2.5 of them each time
                 let amount = xs::range(&mut rng, 1..(grams_remaining + 1)) as Grams;
 
-                events.push(Event::Bought(Food{
+                events.push(Event::Ate(Food{
                     key: type_.key.clone(),
                     grams: amount,
                 }));
@@ -212,7 +217,7 @@ mod basic {
             match xs::range(&mut rng, 0..4) {
                 0 => {
                     // Go shopping
-                    // TODO Count grams and buy a set amount of grams insteam of an item count?
+                    // TODO Count grams and buy a set amount of grams instead of an item count?
                     for _ in 0..shopping_buy_count {
                         events.push(Event::Bought(Food::from_rng(&food_types, &mut rng)));
                     }
@@ -221,6 +226,15 @@ mod basic {
                     // Skip shopping
                 }
             }
+
+            // Have random things happen sometimes as ana attempt to capture things not explicitly modeled
+            match xs::range(&mut rng, 0..16) {
+                0 => {
+                    events.push(Event::from_rng(&food_types, &mut rng));
+                },
+                _ => {}
+            }
+
         }
         assert!(events.len() > food_types.len());
 
@@ -232,7 +246,13 @@ mod basic {
             simulate(&mut study, event);
         }
 
-        writeln!(w, "{:#?},", all_stats)?;
+        let mut performance: Performance = 0;
+
+        for stats in &all_stats {
+            performance = core::cmp::max(performance, stats.snapshot.performance());
+        }
+
+        writeln!(w, "performance (closer to 0 is better): {performance},")?;
 
         Ok(())
     }
