@@ -182,10 +182,11 @@ mod basic {
 
         let day_count = (xs::range(&mut rng, 1..2) * 7) as usize;
 
-        let mut events = Vec::with_capacity(day_count);
+        type Events = Vec<Event>;
+
+        let mut events: Events = Vec::with_capacity(day_count);
 
         // TODO An actual reasonable purchase strategy
-        // TODO Make hunger models and purchase strategies configurable
         let initial_buy_count = food_types.len();
 
         for i in 0..initial_buy_count {
@@ -193,18 +194,25 @@ mod basic {
         }
 
         // Eat a given amount of food each day, and each evening go on 0 to 2 shopping trips.
-        let grams_per_day = 2000; // TODO? random range? Configurable
+
         let shopping_buy_count = 3;
 
-        for _ in 0..day_count {
+        // TODO Make hunger models and purchase strategies configurable
+        // TODO allow diffrent models to have different param types.
+        // TODO? Model hunger models, purchase strats, and extra variance all with one type?
+        type HungerModel = fn (&mut Events, &mut Xs, &FoodTypes);
+
+        fn fixed_amount(events: &mut Events, rng: &mut Xs, food_types: &FoodTypes) {
+            let grams_per_day = 2000; // TODO? random range? Configurable
+
             let mut grams_remaining = grams_per_day;
             while grams_remaining > 0 {
-                let index = xs::range(&mut rng, 0..food_types.len() as u32) as usize;
+                let index = xs::range(rng, 0..food_types.len() as u32) as usize;
 
                 let type_ = &food_types[index];
 
                 // TODO Define a serving on each food type, and eat say 1.5 to 2.5 of them each time
-                let amount = xs::range(&mut rng, 1..(grams_remaining + 1)) as Grams;
+                let amount = xs::range(rng, 1..(grams_remaining + 1)) as Grams;
 
                 events.push(Event::Ate(Food{
                     key: type_.key.clone(),
@@ -213,6 +221,12 @@ mod basic {
 
                 grams_remaining = grams_remaining.saturating_sub(amount as _);
             }
+        }
+
+        let hunger_model: HungerModel = fixed_amount;
+
+        for _ in 0..day_count {
+            hunger_model(&mut events, &mut rng, &food_types);
 
             match xs::range(&mut rng, 0..4) {
                 0 => {
@@ -227,7 +241,7 @@ mod basic {
                 }
             }
 
-            // Have random things happen sometimes as ana attempt to capture things not explicitly modeled
+            // Have random things happen sometimes as an attempt to capture things not explicitly modeled
             match xs::range(&mut rng, 0..16) {
                 0 => {
                     events.push(Event::from_rng(&food_types, &mut rng));
@@ -245,6 +259,20 @@ mod basic {
 
             simulate(&mut study, event);
         }
+
+        writeln!(w, "grams: [")?;
+        for stats in &all_stats {
+            writeln!(w, "    {}", stats.total_grams)?;
+        }
+        writeln!(w, "]")?;
+
+        writeln!(w, "")?;
+
+        writeln!(w, "items: [")?;
+        for stats in &all_stats {
+            writeln!(w, "    {}", stats.total_items)?;
+        }
+        writeln!(w, "]")?;
 
         let mut performance: Performance = 0;
 
