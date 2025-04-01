@@ -196,25 +196,22 @@ mod basic {
         // TODO Make hunger models and purchase strategies configurable
         // TODO allow diffrent models to have different param types.
         // TODO? Model hunger models, purchase strats, and extra variance all with one type?
-
-        /* A struct like this seems to cause more problems than separate arguments, even when accounting for
-        // needing to update each function when adding a new param.
         struct EventSourceBundle<'events, 'rng, 'food_types> {
             events: &'events mut Events,
             rng: &'rng mut Xs,
             food_types: &'food_types FoodTypes
         }
-        */
+
         type EventSource = fn (
-            events: &mut Events,
-            rng: &mut Xs,
-            food_types: &FoodTypes
+            EventSourceBundle<'_, '_, '_>
         );
 
         fn fixed_hunger_amount(
-            events: &mut Events,
-            rng: &mut Xs,
-            food_types: &FoodTypes
+            EventSourceBundle {
+                events,
+                rng,
+                food_types
+            }: EventSourceBundle
         ) {
             let grams_per_day = 2000; // TODO? random range? Configurable
 
@@ -237,9 +234,11 @@ mod basic {
         }
 
         fn shop_some_days(
-            events: &mut Events,
-            rng: &mut Xs,
-            food_types: &FoodTypes
+            EventSourceBundle {
+                events,
+                rng,
+                food_types
+            }: EventSourceBundle
         ) {
             // Each evening go on 0 to 2 shopping trips.
 
@@ -260,9 +259,11 @@ mod basic {
         }
 
         fn unlikely_random_event(
-            events: &mut Events,
-            rng: &mut Xs,
-            food_types: &FoodTypes
+            EventSourceBundle {
+                events,
+                rng,
+                food_types
+            }: EventSourceBundle
         ) {
             // Have random things happen sometimes as an attempt to capture things not explicitly modeled
             match xs::range(rng, 0..16) {
@@ -277,10 +278,14 @@ mod basic {
         let purchase_strat: EventSource = shop_some_days;
         let extra_variance: EventSource = unlikely_random_event;
 
+        macro_rules! b {
+            () => { EventSourceBundle { events: &mut events, rng: &mut rng, food_types: &food_types } }
+        }
+
         for _ in 0..day_count {
-            hunger_model(&mut events, &mut rng, &food_types);
-            purchase_strat(&mut events, &mut rng, &food_types);
-            extra_variance(&mut events, &mut rng, &food_types);
+            hunger_model(b!());
+            purchase_strat(b!());
+            extra_variance(b!());
         }
         assert!(events.len() > food_types.len());
 
