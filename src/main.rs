@@ -193,16 +193,29 @@ mod basic {
             events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize], &mut rng)));
         }
 
-        // Eat a given amount of food each day, and each evening go on 0 to 2 shopping trips.
-
-        let shopping_buy_count = 3;
-
         // TODO Make hunger models and purchase strategies configurable
         // TODO allow diffrent models to have different param types.
         // TODO? Model hunger models, purchase strats, and extra variance all with one type?
-        type HungerModel = fn (&mut Events, &mut Xs, &FoodTypes);
 
-        fn fixed_amount(events: &mut Events, rng: &mut Xs, food_types: &FoodTypes) {
+        /* A struct like this seems to cause more problems than separate arguments, even when accounting for
+        // needing to update each function when adding a new param.
+        struct EventSourceBundle<'events, 'rng, 'food_types> {
+            events: &'events mut Events,
+            rng: &'rng mut Xs,
+            food_types: &'food_types FoodTypes
+        }
+        */
+        type EventSource = fn (
+            events: &mut Events,
+            rng: &mut Xs,
+            food_types: &FoodTypes
+        );
+
+        fn fixed_hunger_amount(
+            events: &mut Events,
+            rng: &mut Xs,
+            food_types: &FoodTypes
+        ) {
             let grams_per_day = 2000; // TODO? random range? Configurable
 
             let mut grams_remaining = grams_per_day;
@@ -223,32 +236,51 @@ mod basic {
             }
         }
 
-        let hunger_model: HungerModel = fixed_amount;
+        fn shop_some_days(
+            events: &mut Events,
+            rng: &mut Xs,
+            food_types: &FoodTypes
+        ) {
+            // Each evening go on 0 to 2 shopping trips.
 
-        for _ in 0..day_count {
-            hunger_model(&mut events, &mut rng, &food_types);
+            let shopping_buy_count = 3;
 
-            match xs::range(&mut rng, 0..4) {
+            match xs::range(rng, 0..4) {
                 0 => {
                     // Go shopping
                     // TODO Count grams and buy a set amount of grams instead of an item count?
                     for _ in 0..shopping_buy_count {
-                        events.push(Event::Bought(Food::from_rng(&food_types, &mut rng)));
+                        events.push(Event::Bought(Food::from_rng(food_types, rng)));
                     }
                 },
                 _ => {
                     // Skip shopping
                 }
             }
+        }
 
+        fn unlikely_random_event(
+            events: &mut Events,
+            rng: &mut Xs,
+            food_types: &FoodTypes
+        ) {
             // Have random things happen sometimes as an attempt to capture things not explicitly modeled
-            match xs::range(&mut rng, 0..16) {
+            match xs::range(rng, 0..16) {
                 0 => {
-                    events.push(Event::from_rng(&food_types, &mut rng));
+                    events.push(Event::from_rng(food_types, rng));
                 },
                 _ => {}
             }
+        }
 
+        let hunger_model: EventSource = fixed_hunger_amount;
+        let purchase_strat: EventSource = shop_some_days;
+        let extra_variance: EventSource = unlikely_random_event;
+
+        for _ in 0..day_count {
+            hunger_model(&mut events, &mut rng, &food_types);
+            purchase_strat(&mut events, &mut rng, &food_types);
+            extra_variance(&mut events, &mut rng, &food_types);
         }
         assert!(events.len() > food_types.len());
 
