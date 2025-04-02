@@ -193,17 +193,40 @@ mod basic {
             events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize], &mut rng)));
         }
 
+        struct FixedHungerParams {
+            grams_per_day: Grams,
+        }
+
+        /// One past max value of a die to roll from 0 to. So a value of 6 indicates a roll between 6 values from
+        /// 0 to 5 inclusive. Often used where somthing happens on a roll of 0, and nothing otherwise.
+        // TODO a more intuitive representation of the roll being made.
+        type RollOnePastMax = u8;
+
+        struct ShopSomeDaysParams {
+            buy_count: u8,
+            roll_one_past_max: RollOnePastMax,
+        }
+
+        struct RandomEventParams {
+            roll_one_past_max: RollOnePastMax,
+        }
+
+        enum EventSourceSpec {
+            FixedHungerAmount(FixedHungerParams),
+            ShopSomeDays(ShopSomeDaysParams),
+            RandomEvent(RandomEventParams),
+        }
+
         // TODO Make hunger models and purchase strategies configurable
-        // TODO allow diffrent models to have different param types.
-        // TODO? Model hunger models, purchase strats, and extra variance all with one type?
         struct EventSourceBundle<'events, 'rng, 'food_types> {
             events: &'events mut Events,
             rng: &'rng mut Xs,
             food_types: &'food_types FoodTypes
         }
 
-        type EventSource = fn (
-            EventSourceBundle<'_, '_, '_>
+        type EventSource<Params> = fn (
+            EventSourceBundle<'_, '_, '_>,
+            Params
         );
 
         fn fixed_hunger_amount(
@@ -211,18 +234,17 @@ mod basic {
                 events,
                 rng,
                 food_types
-            }: EventSourceBundle
+            }: EventSourceBundle,
+            FixedHungerParams { grams_per_day }: &FixedHungerParams,
         ) {
-            let grams_per_day = 2000; // TODO? random range? Configurable
-
-            let mut grams_remaining = grams_per_day;
+            let mut grams_remaining = *grams_per_day;
             while grams_remaining > 0 {
                 let index = xs::range(rng, 0..food_types.len() as u32) as usize;
 
                 let type_ = &food_types[index];
 
                 // TODO Define a serving on each food type, and eat say 1.5 to 2.5 of them each time
-                let amount = xs::range(rng, 1..(grams_remaining + 1)) as Grams;
+                let amount = xs::range(rng, 1..(grams_remaining as u32 + 1)) as Grams;
 
                 events.push(Event::Ate(Food{
                     key: type_.key.clone(),
@@ -238,17 +260,17 @@ mod basic {
                 events,
                 rng,
                 food_types
-            }: EventSourceBundle
+            }: EventSourceBundle,
+            ShopSomeDaysParams {
+                buy_count,
+                roll_one_past_max,
+            }: &ShopSomeDaysParams,
         ) {
-            // Each evening go on 0 to 2 shopping trips.
-
-            let shopping_buy_count = 3;
-
-            match xs::range(rng, 0..4) {
+            match xs::range(rng, 0..(*roll_one_past_max as u32)) {
                 0 => {
                     // Go shopping
                     // TODO Count grams and buy a set amount of grams instead of an item count?
-                    for _ in 0..shopping_buy_count {
+                    for _ in 0..*buy_count {
                         events.push(Event::Bought(Food::from_rng(food_types, rng)));
                     }
                 },
@@ -258,15 +280,18 @@ mod basic {
             }
         }
 
-        fn unlikely_random_event(
+        fn random_event(
             EventSourceBundle {
                 events,
                 rng,
                 food_types
-            }: EventSourceBundle
+            }: EventSourceBundle,
+            RandomEventParams {
+                roll_one_past_max,
+            }: &RandomEventParams,
         ) {
             // Have random things happen sometimes as an attempt to capture things not explicitly modeled
-            match xs::range(rng, 0..16) {
+            match xs::range(rng, 0..(*roll_one_past_max as u32)) {
                 0 => {
                     events.push(Event::from_rng(food_types, rng));
                 },
@@ -274,18 +299,31 @@ mod basic {
             }
         }
 
-        let hunger_model: EventSource = fixed_hunger_amount;
-        let purchase_strat: EventSource = shop_some_days;
-        let extra_variance: EventSource = unlikely_random_event;
+        let event_source_specs = vec![
+            EventSourceSpec::FixedHungerAmount(FixedHungerParams {
+                grams_per_day: 2000,
+            }),
+            EventSourceSpec::ShopSomeDays(ShopSomeDaysParams {
+                buy_count: 3,
+                roll_one_past_max: 4,
+            }),
+            EventSourceSpec::RandomEvent(RandomEventParams {
+                roll_one_past_max: 16,
+            }),
+        ];
 
         macro_rules! b {
             () => { EventSourceBundle { events: &mut events, rng: &mut rng, food_types: &food_types } }
         }
 
         for _ in 0..day_count {
-            hunger_model(b!());
-            purchase_strat(b!());
-            extra_variance(b!());
+            for es_spec in &event_source_specs {
+                match es_spec {
+                    EventSourceSpec::FixedHungerAmount(p) => fixed_hunger_amount(b!(), p),
+                    EventSourceSpec::ShopSomeDays(p) => shop_some_days(b!(), p),
+                    EventSourceSpec::RandomEvent(p) => random_event(b!(), p),
+                }
+            }
         }
         assert!(events.len() > food_types.len());
 
