@@ -2,8 +2,33 @@ use vec1::Vec1;
 
 pub type FoodTypes = Vec1<food::Type>; 
 
+pub struct FixedHungerParams {
+    pub grams_per_day: food::Grams,
+}
+
+/// One past max value of a die to roll from 0 to. So a value of 6 indicates a roll between 6 values from
+/// 0 to 5 inclusive. Often used where somthing happens on a roll of 0, and nothing otherwise.
+// TODO a more intuitive representation of the roll being made.
+pub type RollOnePastMax = u8;
+
+pub struct ShopSomeDaysParams {
+    pub buy_count: u8,
+    pub roll_one_past_max: RollOnePastMax,
+}
+
+pub struct RandomEventParams {
+    pub roll_one_past_max: RollOnePastMax,
+}
+
+pub enum EventSourceSpec {
+    FixedHungerAmount(FixedHungerParams),
+    ShopSomeDays(ShopSomeDaysParams),
+    RandomEvent(RandomEventParams),
+}
+
 pub struct BasicExtras {
     pub food_types: FoodTypes,
+    pub event_source_specs: Vec1<EventSourceSpec>,
 }
 
 #[derive(Default)]

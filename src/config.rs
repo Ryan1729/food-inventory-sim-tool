@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicExtras, FoodTypes, Mode, Seed, Spec, Res};
+use crate::types::{self, food, BasicExtras, FoodTypes, Mode, Res, RollOnePastMax, Seed, Spec};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -58,6 +58,22 @@ impl core::fmt::Display for RawMode {
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+enum RawEventSourceSpecKind {
+    FixedHungerAmount,
+    ShopSomeDays,
+    RandomEvent,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct RawEventSourceSpec {
+    pub kind: RawEventSourceSpecKind,
+    // All of the fields from all of the params
+    pub grams_per_day: food::Grams,
+    pub buy_count: u8,
+    pub roll_one_past_max: RollOnePastMax,
+}
+
 #[derive(serde::Deserialize)]
 struct RawSpec {
     // All modes
@@ -65,6 +81,7 @@ struct RawSpec {
     pub seed: Option<Seed>,
     // Basic extras
     pub food_types: Vec<food::Type>,
+    pub event_source_specs: Vec<RawEventSourceSpec>,
 }
 
 pub fn get_spec() -> Res<Spec> {
@@ -119,8 +136,28 @@ pub fn get_spec() -> Res<Spec> {
                 seen.insert(food_type.key.clone());
             }
 
+            let mut event_source_specs_vec = Vec::with_capacity(unvalidated_spec.event_source_specs.len());
+
+            for e_s_spec in unvalidated_spec.event_source_specs {    
+                use RawEventSourceSpecKind::*;
+                match e_s_spec.kind {
+                    FixedHungerAmount => {
+                        todo!();
+                    },
+                    ShopSomeDays => {
+                        todo!();
+                    },
+                    RandomEvent => {
+                        todo!();
+                    },
+                }
+            }
+
+            let event_source_specs = event_source_specs_vec.try_into()?;
+
             Mode::Basic(BasicExtras {
                 food_types,
+                event_source_specs,
             })
         },
     };

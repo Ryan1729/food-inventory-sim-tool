@@ -34,7 +34,7 @@ mod minimal {
 mod basic {
     use std::io::Write;
     use crate::xs::{self, Xs};
-    use crate::types::{FoodTypes, food::{self, Grams}, Spec};
+    use crate::types::{*, FoodTypes, food::{self, Grams}, Spec};
 
     #[derive(Clone, Debug)]
     struct Food {
@@ -167,9 +167,9 @@ mod basic {
     }
 
     pub fn run(spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
-        let food_types = match &spec.mode {
-            crate::Mode::Basic(crate::types::BasicExtras { food_types }) => {
-                food_types
+        let crate::types::BasicExtras { food_types, event_source_specs } = match &spec.mode {
+            crate::Mode::Basic(extras) => {
+                extras
             },
             _ => {
                 panic!("TODO get rid of this case?");
@@ -191,30 +191,6 @@ mod basic {
 
         for i in 0..initial_buy_count {
             events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize], &mut rng)));
-        }
-
-        struct FixedHungerParams {
-            grams_per_day: Grams,
-        }
-
-        /// One past max value of a die to roll from 0 to. So a value of 6 indicates a roll between 6 values from
-        /// 0 to 5 inclusive. Often used where somthing happens on a roll of 0, and nothing otherwise.
-        // TODO a more intuitive representation of the roll being made.
-        type RollOnePastMax = u8;
-
-        struct ShopSomeDaysParams {
-            buy_count: u8,
-            roll_one_past_max: RollOnePastMax,
-        }
-
-        struct RandomEventParams {
-            roll_one_past_max: RollOnePastMax,
-        }
-
-        enum EventSourceSpec {
-            FixedHungerAmount(FixedHungerParams),
-            ShopSomeDays(ShopSomeDaysParams),
-            RandomEvent(RandomEventParams),
         }
 
         // TODO Make hunger models and purchase strategies configurable
@@ -299,25 +275,12 @@ mod basic {
             }
         }
 
-        let event_source_specs = vec![
-            EventSourceSpec::FixedHungerAmount(FixedHungerParams {
-                grams_per_day: 2000,
-            }),
-            EventSourceSpec::ShopSomeDays(ShopSomeDaysParams {
-                buy_count: 3,
-                roll_one_past_max: 4,
-            }),
-            EventSourceSpec::RandomEvent(RandomEventParams {
-                roll_one_past_max: 16,
-            }),
-        ];
-
         macro_rules! b {
             () => { EventSourceBundle { events: &mut events, rng: &mut rng, food_types: &food_types } }
         }
 
         for _ in 0..day_count {
-            for es_spec in &event_source_specs {
+            for es_spec in event_source_specs.iter() {
                 match es_spec {
                     EventSourceSpec::FixedHungerAmount(p) => fixed_hunger_amount(b!(), p),
                     EventSourceSpec::ShopSomeDays(p) => shop_some_days(b!(), p),
