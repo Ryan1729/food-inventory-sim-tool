@@ -2,7 +2,7 @@ use vec1::Vec1;
 
 pub type FoodTypes = Vec1<food::Type>; 
 
-pub struct FixedHungerParams {
+pub struct FixedHungerAmountParams {
     pub grams_per_day: food::Grams,
 }
 
@@ -21,7 +21,7 @@ pub struct RandomEventParams {
 }
 
 pub enum EventSourceSpec {
-    FixedHungerAmount(FixedHungerParams),
+    FixedHungerAmount(FixedHungerAmountParams),
     ShopSomeDays(ShopSomeDaysParams),
     RandomEvent(RandomEventParams),
 }

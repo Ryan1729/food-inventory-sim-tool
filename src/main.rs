@@ -193,7 +193,6 @@ mod basic {
             events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize], &mut rng)));
         }
 
-        // TODO Make hunger models and purchase strategies configurable
         struct EventSourceBundle<'events, 'rng, 'food_types> {
             events: &'events mut Events,
             rng: &'rng mut Xs,
@@ -211,7 +210,7 @@ mod basic {
                 rng,
                 food_types
             }: EventSourceBundle,
-            FixedHungerParams { grams_per_day }: &FixedHungerParams,
+            FixedHungerAmountParams { grams_per_day }: &FixedHungerAmountParams,
         ) {
             let mut grams_remaining = *grams_per_day;
             while grams_remaining > 0 {
