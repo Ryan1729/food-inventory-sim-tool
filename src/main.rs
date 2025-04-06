@@ -186,11 +186,11 @@ mod basic {
 
         let mut events: Events = Vec::with_capacity(day_count);
 
-        // TODO An actual reasonable purchase strategy
-        let initial_buy_count = food_types.len();
+        // TODO make initial purchase strat configurable
+        let initial_buy_count = food_types.len() * 3;
 
         for i in 0..initial_buy_count {
-            events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize], &mut rng)));
+            events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize % food_types.len()], &mut rng)));
         }
 
         struct EventSourceBundle<'events, 'rng, 'food_types> {
@@ -198,11 +198,6 @@ mod basic {
             rng: &'rng mut Xs,
             food_types: &'food_types FoodTypes
         }
-
-        type EventSource<Params> = fn (
-            EventSourceBundle<'_, '_, '_>,
-            Params
-        );
 
         fn fixed_hunger_amount(
             EventSourceBundle {
@@ -230,6 +225,8 @@ mod basic {
             }
         }
 
+        // TODO An actual reasonable purchase strategy
+        //    Something based on the threshold of how much of each food we have left
         fn shop_some_days(
             EventSourceBundle {
                 events,
@@ -241,7 +238,7 @@ mod basic {
                 roll_one_past_max,
             }: &ShopSomeDaysParams,
         ) {
-            match xs::range(rng, 0..(*roll_one_past_max as u32)) {
+            match xs::range(rng, 0..roll_one_past_max.u32()) {
                 0 => {
                     // Go shopping
                     // TODO Count grams and buy a set amount of grams instead of an item count?
@@ -266,7 +263,7 @@ mod basic {
             }: &RandomEventParams,
         ) {
             // Have random things happen sometimes as an attempt to capture things not explicitly modeled
-            match xs::range(rng, 0..(*roll_one_past_max as u32)) {
+            match xs::range(rng, 0..roll_one_past_max.u32()) {
                 0 => {
                     events.push(Event::from_rng(food_types, rng));
                 },
@@ -312,11 +309,17 @@ mod basic {
         writeln!(w, "]")?;
 
         let mut performance: Performance = 0;
+        let mut out_count: Grams = 0;
+        let mut starved_count: u16 = 0;
 
         for stats in &all_stats {
             performance = core::cmp::max(performance, stats.snapshot.performance());
+            out_count = core::cmp::max(out_count, stats.snapshot.out_count);
+            starved_count = core::cmp::max(starved_count, stats.snapshot.starved_count);
         }
 
+        writeln!(w, "out_count (closer to 0 is better): {out_count}")?;
+        writeln!(w, "starved_count (closer to 0 is better): {starved_count}\n")?;
         writeln!(w, "performance (closer to 0 is better): {performance},")?;
 
         Ok(())

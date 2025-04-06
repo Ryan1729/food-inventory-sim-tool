@@ -3,5 +3,32 @@ Spec(
     // To set this in an environment variable use the following syntax:
     // FIST_SEED=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
     seed: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
-    food_types: [], // TODO fill. Empty like this ought to be an config error
+    food_types: [
+        Type (
+            key: "Jam",
+            options: [
+                Option (
+                    grams: 500,
+                ),
+                Option (
+                    grams: 1000,
+                ),
+            ],
+        ),
+    ],
+    event_source_specs: [
+        (
+            kind: "FixedHungerAmount",
+            grams_per_day: 2000,
+        ),
+        (
+            kind: "ShopSomeDays",
+            buy_count: 3,
+            roll_one_past_max: 4,
+        ),
+        (
+            kind: "RandomEvent",
+            roll_one_past_max: 16,
+        ),
+    ],
 )
