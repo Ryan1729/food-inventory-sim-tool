@@ -186,17 +186,24 @@ mod basic {
 
         let mut events: Events = Vec::with_capacity(day_count);
 
-        // TODO make initial purchase strat configurable
-        let initial_buy_count = food_types.len() * 3;
-
-        for i in 0..initial_buy_count {
-            events.push(Event::Bought(Food::from_rng_of_type(&food_types[i as usize % food_types.len()], &mut rng)));
-        }
-
         struct EventSourceBundle<'events, 'rng, 'food_types> {
             events: &'events mut Events,
             rng: &'rng mut Xs,
             food_types: &'food_types FoodTypes
+        }
+
+        fn buy_random_variety(
+            EventSourceBundle {
+                events,
+                rng,
+                food_types
+            }: EventSourceBundle,
+            BuyRandomVarietyParams { count, offset }: &BuyRandomVarietyParams,
+        ) {
+            for i in 0..*count {
+                let index = (i as usize).wrapping_add(*offset) % food_types.len();
+                events.push(Event::Bought(Food::from_rng_of_type(&food_types[index], rng)));
+            }
         }
 
         fn fixed_hunger_amount(
@@ -274,6 +281,9 @@ mod basic {
         macro_rules! b {
             () => { EventSourceBundle { events: &mut events, rng: &mut rng, food_types: &food_types } }
         }
+
+        // TODO make initial purchase strat configurable
+        buy_random_variety(b!(), &BuyRandomVarietyParams { count: (food_types.len() * 3) as _, offset: 3 });
 
         for _ in 0..day_count {
             for es_spec in event_source_specs.iter() {

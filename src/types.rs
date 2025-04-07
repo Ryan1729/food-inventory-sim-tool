@@ -4,6 +4,11 @@ use std::num::NonZeroU8;
 
 pub type FoodTypes = Vec1<food::Type>; 
 
+pub struct BuyRandomVarietyParams { 
+    pub count: u16, // 64k items in one trip ought to be enough for anybody!
+    pub offset: usize,
+}
+
 pub struct FixedHungerAmountParams {
     pub grams_per_day: food::Grams,
 }
