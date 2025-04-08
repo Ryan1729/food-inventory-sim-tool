@@ -167,7 +167,11 @@ mod basic {
     }
 
     pub fn run(spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
-        let crate::types::BasicExtras { food_types, event_source_specs } = match &spec.mode {
+        let crate::types::BasicExtras {
+            food_types,
+            initial_event_source_specs,
+            repeated_event_source_specs,
+        } = match &spec.mode {
             crate::Mode::Basic(extras) => {
                 extras
             },
@@ -282,17 +286,23 @@ mod basic {
             () => { EventSourceBundle { events: &mut events, rng: &mut rng, food_types: &food_types } }
         }
 
-        // TODO make initial purchase strat configurable
-        buy_random_variety(b!(), &BuyRandomVarietyParams { count: (food_types.len() * 3) as _, offset: 3 });
-
-        for _ in 0..day_count {
-            for es_spec in event_source_specs.iter() {
-                match es_spec {
-                    EventSourceSpec::FixedHungerAmount(p) => fixed_hunger_amount(b!(), p),
-                    EventSourceSpec::ShopSomeDays(p) => shop_some_days(b!(), p),
-                    EventSourceSpec::RandomEvent(p) => random_event(b!(), p),
+        macro_rules! get_events {
+            ($es_specs: expr) => {
+                for es_spec in $es_specs.iter() {
+                    match es_spec {
+                        EventSourceSpec::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
+                        EventSourceSpec::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),
+                        EventSourceSpec::ShopSomeDays(p) => shop_some_days(b!(), &p),
+                        EventSourceSpec::RandomEvent(p) => random_event(b!(), &p),
+                    }
                 }
             }
+        }
+
+        get_events!(initial_event_source_specs);
+
+        for _ in 0..day_count {
+            get_events!(repeated_event_source_specs);
         }
         assert!(events.len() > food_types.len());
 

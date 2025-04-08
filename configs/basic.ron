@@ -16,7 +16,14 @@ Spec(
             ],
         ),
     ],
-    event_source_specs: [
+    initial_event_source_specs: [
+        (
+            kind: "BuyRandomVariety",
+            count: 3,
+            offset: 1,
+        ),
+    ],
+    repeated_event_source_specs: [
         (
             kind: "FixedHungerAmount",
             grams_per_day: 2000,

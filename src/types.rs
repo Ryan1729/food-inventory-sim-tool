@@ -41,6 +41,7 @@ pub struct RandomEventParams {
 }
 
 pub enum EventSourceSpec {
+    BuyRandomVariety(BuyRandomVarietyParams),
     FixedHungerAmount(FixedHungerAmountParams),
     ShopSomeDays(ShopSomeDaysParams),
     RandomEvent(RandomEventParams),
@@ -48,7 +49,8 @@ pub enum EventSourceSpec {
 
 pub struct BasicExtras {
     pub food_types: FoodTypes,
-    pub event_source_specs: Vec1<EventSourceSpec>,
+    pub initial_event_source_specs: Vec1<EventSourceSpec>,
+    pub repeated_event_source_specs: Vec1<EventSourceSpec>,
 }
 
 #[derive(Default)]

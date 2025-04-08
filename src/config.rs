@@ -79,6 +79,7 @@ impl core::fmt::Display for RawMode {
 
 #[derive(Debug, serde::Deserialize)]
 enum RawEventSourceSpecKind {
+    BuyRandomVariety,
     FixedHungerAmount,
     ShopSomeDays,
     RandomEvent,
@@ -93,6 +94,10 @@ struct RawEventSourceSpec {
     #[serde(default)]
     pub buy_count: u8,
     #[serde(default)]
+    pub count: u16,
+    #[serde(default)]
+    pub offset: usize,
+    #[serde(default)]
     pub roll_one_past_max: RollOnePastMax,
 }
 
@@ -105,7 +110,9 @@ struct RawSpec {
     #[serde(default)]
     pub food_types: Vec<food::Type>,
     #[serde(default)]
-    pub event_source_specs: Vec<RawEventSourceSpec>,
+    pub initial_event_source_specs: Vec<RawEventSourceSpec>,
+    #[serde(default)]
+    pub repeated_event_source_specs: Vec<RawEventSourceSpec>,
 }
 
 pub fn get_spec() -> Res<Spec> {
@@ -160,87 +167,112 @@ pub fn get_spec() -> Res<Spec> {
                 seen.insert(food_type.key.clone());
             }
 
-            let mut event_source_specs_vec = Vec::with_capacity(unvalidated_spec.event_source_specs.len());
+            fn is_default<T: PartialEq + Default>(thing: &T) -> bool {
+                PartialEq::eq(thing, &T::default())
+            }
 
-            for i in 0..unvalidated_spec.event_source_specs.len() {
-                use RawEventSourceSpecKind::*;
-                use crate::types::EventSourceSpec as ESS;
-
-                let e_s_spec = &unvalidated_spec.event_source_specs[i];
-
-                fn is_default<T: PartialEq + Default>(thing: &T) -> bool {
-                    PartialEq::eq(thing, &T::default())
-                }
-
-                macro_rules! excess_data_check {
-                    ($($key: ident)+) => {
-                        $(
-                            if !is_default(&e_s_spec.$key) {
-                                // TODO? A strict run mode that makes this a hard error?
-                                eprintln!(
-                                    "Warning: {}",
-                                    ExcessDataError{
-                                        mode: RawMode::Basic,
-                                        key_name: format!("event_source_specs[{i}].{} for {:?}", stringify!($key), e_s_spec.kind),
-                                    },
-                                );
-                            }
-                        )+
-                    }
-                }
-
-                use crate::types::{FixedHungerAmountParams, RandomEventParams, ShopSomeDaysParams};
-
-                match e_s_spec.kind {
-                    FixedHungerAmount => {
-                        excess_data_check!(
-                            buy_count roll_one_past_max
-                        );
-
-                        event_source_specs_vec.push(
-                            ESS::FixedHungerAmount(FixedHungerAmountParams {
-                                grams_per_day: e_s_spec.grams_per_day
-                            })
-                        );
-                    },
-                    ShopSomeDays => {
-                        excess_data_check!(
-                            grams_per_day
-                        );
-
-                        event_source_specs_vec.push(
-                            ESS::ShopSomeDays(ShopSomeDaysParams {
-                                buy_count: e_s_spec.buy_count,
-                                roll_one_past_max: e_s_spec.roll_one_past_max,
-                            })
-                        );
-                    },
-                    RandomEvent => {
-                        excess_data_check!(
-                            grams_per_day buy_count
-                        );
-
-                        event_source_specs_vec.push(
-                            ESS::RandomEvent(RandomEventParams {
-                                roll_one_past_max: e_s_spec.roll_one_past_max,
-                            })
-                        );
-                    },
+            macro_rules! excess_data_check {
+                ($specs: ident [$i: ident] $error_key: literal : $($key: ident)+) => {
+                    $(
+                        if !is_default(&$specs[$i].$key) {
+                            // TODO? A strict run mode that makes this a hard error?
+                            eprintln!(
+                                "Warning: {}",
+                                ExcessDataError{
+                                    mode: RawMode::Basic,
+                                    key_name: format!("{}[{}].{} for {:?}", $error_key, $i, stringify!($key), $specs[$i].kind),
+                                },
+                            );
+                        }
+                    )+
                 }
             }
 
-            let event_source_specs = event_source_specs_vec
-                .try_into()
-                .map_err(
-                    |_| AtLeastOneRequiredError {
-                        mode: RawMode::Basic,
-                        key_name: "event_source_specs".to_string(),
+            macro_rules! validate_event_source_specs {
+                ($error_key: literal : $specs: expr) => ({
+                    let specs = &$specs;
+                    let mut specs_vec = Vec::with_capacity(specs.len());
+
+                    for i in 0..specs.len() {
+                        use RawEventSourceSpecKind::*;
+                        use crate::types::EventSourceSpec as ESS;
+
+                        let e_s_spec = &specs[i];
+
+                        use crate::types::{FixedHungerAmountParams, RandomEventParams, ShopSomeDaysParams, BuyRandomVarietyParams};
+
+                        match e_s_spec.kind {
+                            BuyRandomVariety => {
+                                excess_data_check!(
+                                    specs[i] $error_key : grams_per_day buy_count roll_one_past_max
+                                );
+
+                                specs_vec.push(
+                                    ESS::BuyRandomVariety(BuyRandomVarietyParams {
+                                        count: e_s_spec.count,
+                                        offset: e_s_spec.offset,
+                                    })
+                                );
+                            }
+                            FixedHungerAmount => {
+                                excess_data_check!(
+                                    specs[i] $error_key : buy_count roll_one_past_max
+                                );
+
+                                specs_vec.push(
+                                    ESS::FixedHungerAmount(FixedHungerAmountParams {
+                                        grams_per_day: e_s_spec.grams_per_day
+                                    })
+                                );
+                            },
+                            ShopSomeDays => {
+                                excess_data_check!(
+                                    specs[i] $error_key : grams_per_day
+                                );
+
+                                specs_vec.push(
+                                    ESS::ShopSomeDays(ShopSomeDaysParams {
+                                        buy_count: e_s_spec.buy_count,
+                                        roll_one_past_max: e_s_spec.roll_one_past_max,
+                                    })
+                                );
+                            },
+                            RandomEvent => {
+                                excess_data_check!(
+                                    specs[i] $error_key : grams_per_day buy_count
+                                );
+
+                                specs_vec.push(
+                                    ESS::RandomEvent(RandomEventParams {
+                                        roll_one_past_max: e_s_spec.roll_one_past_max,
+                                    })
+                                );
+                            },
+                        }
                     }
-                )?;
+
+                    specs_vec
+                        .try_into()
+                        .map_err(
+                            |_| AtLeastOneRequiredError {
+                                mode: RawMode::Basic,
+                                key_name: $error_key.to_string(),
+                            }
+                        )?
+                })
+            }
+
+            let initial_event_source_specs = validate_event_source_specs!(
+                "initial_event_source_specs" : unvalidated_spec.initial_event_source_specs
+            );
+            let repeated_event_source_specs = validate_event_source_specs!(
+                "repeated_event_source_specs" : unvalidated_spec.repeated_event_source_specs
+            );
 
             Mode::Basic(BasicExtras {
                 food_types,
-                event_source_specs,
+                initial_event_source_specs,
+                repeated_event_source_specs,
             })
         },
     };
