@@ -29,6 +29,10 @@ Spec(
             grams_per_day: 2000,
         ),
         (
+            kind: "BuyIfHalfEmpty",
+            max_count: 255,
+        ),
+        (
             kind: "ShopSomeDays",
             buy_count: 3,
             roll_one_past_max: 4,

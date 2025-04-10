@@ -39,6 +39,7 @@ mod basic {
     #[derive(Clone, Debug)]
     struct Food {
         key: food::Key,
+        option: food::Option,
         grams: Grams,
         // TODO expiry date. Or maybe in a different model
     }
@@ -56,10 +57,19 @@ mod basic {
             let option_index = xs::range(rng, 0..type_.options.len() as u32) as usize;
             let option = &type_.options[option_index];
 
+            Self::of_type(&type_, option.clone())
+        }
+
+        fn of_type(type_: &food::Type, option: food::Option) -> Self {
             Self {
                 key: type_.key.clone(),
-                grams: option.grams,
+                grams: option.grams, // Full of the current grams
+                option: option,
             }
+        }
+
+        pub fn is_half_empty(&self) -> bool {
+            self.grams <= (self.option.grams / 2)
         }
     }
 
@@ -89,7 +99,7 @@ mod basic {
 
     fn simulate(study: &mut Shelf, event: Event) {
         match event {
-            Event::Ate(Food { key, grams }) => {
+            Event::Ate(key, grams, .. ) => {
                 fn eat_at(study: &mut Shelf, index: usize, grams: Grams) {
                     if index >= study.shelf.len() {
                         study.perf.starved_count += 1;
@@ -153,7 +163,7 @@ mod basic {
 
     #[derive(Clone)]
     enum Event {
-        Ate(Food),
+        Ate(food::Key, Grams),
         Bought(Food),
     }
 
@@ -161,7 +171,10 @@ mod basic {
         fn from_rng(food_types: &FoodTypes, rng: &mut Xs) -> Self {
             match xs::range(rng, 0..2 as u32) {
                 1 => Self::Bought(Food::from_rng(food_types, rng)),
-                _ => Self::Ate(Food::from_rng(food_types, rng)),
+                _ => {
+                    let food = Food::from_rng(food_types, rng);
+                    Self::Ate(food.key, food.grams)
+                },
             }
         }
     }
@@ -190,17 +203,58 @@ mod basic {
 
         let mut events: Events = Vec::with_capacity(day_count);
 
-        struct EventSourceBundle<'events, 'rng, 'food_types> {
+        struct EventSourceBundle<'events, 'rng, 'food_types, 'study> {
             events: &'events mut Events,
             rng: &'rng mut Xs,
-            food_types: &'food_types FoodTypes
+            food_types: &'food_types FoodTypes,
+            study: &'study Shelf,
+        }
+
+        fn buy_if_half_empty(
+            EventSourceBundle {
+                events,
+                rng,
+                food_types,
+                study,
+                ..
+            }: EventSourceBundle,
+            BuyIfHalfEmptyParams { max_count, offset }: &BuyIfHalfEmptyParams,
+        ) {
+            let len = study.shelf.len();
+            if len == 0 {
+                // TODO? Fallback to another strat?
+                return
+            }
+
+            let mut index = offset % len;
+            let count = core::cmp::min(
+                ShoppingCount::MAX as usize,
+                core::cmp::min((*max_count) as usize, len)
+            ) as ShoppingCount;
+
+            for _ in 0..count {
+                let food = &study.shelf[index];
+                if food.is_half_empty() {
+                    // TODO? avoid O(n^2) here?
+                    for type_ in food_types.iter() {
+                        if type_.key == food.key {
+                            events.push(Event::Bought(Food::from_rng_of_type(&type_, rng)));
+
+                            break
+                        }
+                    }
+                }
+                index += 1;
+                index %= len;
+            }
         }
 
         fn buy_random_variety(
             EventSourceBundle {
                 events,
                 rng,
-                food_types
+                food_types,
+                ..
             }: EventSourceBundle,
             BuyRandomVarietyParams { count, offset }: &BuyRandomVarietyParams,
         ) {
@@ -214,7 +268,8 @@ mod basic {
             EventSourceBundle {
                 events,
                 rng,
-                food_types
+                food_types,
+                ..
             }: EventSourceBundle,
             FixedHungerAmountParams { grams_per_day }: &FixedHungerAmountParams,
         ) {
@@ -227,10 +282,10 @@ mod basic {
                 // TODO Define a serving on each food type, and eat say 1.5 to 2.5 of them each time
                 let amount = xs::range(rng, 1..(grams_remaining as u32 + 1)) as Grams;
 
-                events.push(Event::Ate(Food{
-                    key: type_.key.clone(),
-                    grams: amount,
-                }));
+                events.push(Event::Ate(
+                    type_.key.clone(),
+                    amount,
+                ));
 
                 grams_remaining = grams_remaining.saturating_sub(amount as _);
             }
@@ -242,7 +297,8 @@ mod basic {
             EventSourceBundle {
                 events,
                 rng,
-                food_types
+                food_types,
+                ..
             }: EventSourceBundle,
             ShopSomeDaysParams {
                 buy_count,
@@ -267,7 +323,8 @@ mod basic {
             EventSourceBundle {
                 events,
                 rng,
-                food_types
+                food_types,
+                ..
             }: EventSourceBundle,
             RandomEventParams {
                 roll_one_past_max,
@@ -283,13 +340,21 @@ mod basic {
         }
 
         macro_rules! b {
-            () => { EventSourceBundle { events: &mut events, rng: &mut rng, food_types: &food_types } }
+            () => {
+                EventSourceBundle {
+                    events: &mut events,
+                    rng: &mut rng,
+                    food_types: &food_types,
+                    study: &study,
+                }
+            }
         }
 
         macro_rules! get_events {
             ($es_specs: expr) => {
                 for es_spec in $es_specs.iter() {
                     match es_spec {
+                        EventSourceSpec::BuyIfHalfEmpty(p) => buy_if_half_empty(b!(), &p),
                         EventSourceSpec::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
                         EventSourceSpec::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),
                         EventSourceSpec::ShopSomeDays(p) => shop_some_days(b!(), &p),

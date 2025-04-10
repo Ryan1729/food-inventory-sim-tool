@@ -79,6 +79,7 @@ impl core::fmt::Display for RawMode {
 
 #[derive(Debug, serde::Deserialize)]
 enum RawEventSourceSpecKind {
+    BuyIfHalfEmpty,
     BuyRandomVariety,
     FixedHungerAmount,
     ShopSomeDays,
@@ -95,6 +96,8 @@ struct RawEventSourceSpec {
     pub buy_count: u8,
     #[serde(default)]
     pub count: u16,
+    #[serde(default)]
+    pub max_count: u16,
     #[serde(default)]
     pub offset: usize,
     #[serde(default)]
@@ -172,7 +175,10 @@ pub fn get_spec() -> Res<Spec> {
             }
 
             macro_rules! excess_data_check {
-                ($specs: ident [$i: ident] $error_key: literal : $($key: ident)+) => {
+                ($specs: ident [$i: ident] $error_key: literal : $($key: ident)+) => ({
+                    // TODO reverse the meaning of the keys, so we don't need to
+                    // update every old one when adding a new key.
+
                     $(
                         if !is_default(&$specs[$i].$key) {
                             // TODO? A strict run mode that makes this a hard error?
@@ -185,7 +191,7 @@ pub fn get_spec() -> Res<Spec> {
                             );
                         }
                     )+
-                }
+                })
             }
 
             macro_rules! validate_event_source_specs {
@@ -199,12 +205,30 @@ pub fn get_spec() -> Res<Spec> {
 
                         let e_s_spec = &specs[i];
 
-                        use crate::types::{FixedHungerAmountParams, RandomEventParams, ShopSomeDaysParams, BuyRandomVarietyParams};
+                        use crate::types::{
+                            FixedHungerAmountParams,
+                            RandomEventParams,
+                            ShopSomeDaysParams,
+                            BuyRandomVarietyParams,
+                            BuyIfHalfEmptyParams,
+                        };
 
                         match e_s_spec.kind {
+                            BuyIfHalfEmpty => {
+                                excess_data_check!(
+                                    specs[i] $error_key : grams_per_day buy_count roll_one_past_max count
+                                );
+
+                                specs_vec.push(
+                                    ESS::BuyIfHalfEmpty(BuyIfHalfEmptyParams {
+                                        max_count: e_s_spec.max_count,
+                                        offset: e_s_spec.offset,
+                                    })
+                                );
+                            }
                             BuyRandomVariety => {
                                 excess_data_check!(
-                                    specs[i] $error_key : grams_per_day buy_count roll_one_past_max
+                                    specs[i] $error_key : grams_per_day buy_count roll_one_past_max max_count
                                 );
 
                                 specs_vec.push(
@@ -216,7 +240,7 @@ pub fn get_spec() -> Res<Spec> {
                             }
                             FixedHungerAmount => {
                                 excess_data_check!(
-                                    specs[i] $error_key : buy_count roll_one_past_max
+                                    specs[i] $error_key : buy_count roll_one_past_max max_count
                                 );
 
                                 specs_vec.push(

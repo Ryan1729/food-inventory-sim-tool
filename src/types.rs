@@ -4,9 +4,19 @@ use std::num::NonZeroU8;
 
 pub type FoodTypes = Vec1<food::Type>; 
 
+/// 64k items in one trip ought to be enough for anybody!
+pub type ShoppingCount = u16;
+
+pub type IndexOffset = usize;
+
+pub struct BuyIfHalfEmptyParams { 
+    pub max_count: ShoppingCount,
+    pub offset: IndexOffset,
+}
+
 pub struct BuyRandomVarietyParams { 
-    pub count: u16, // 64k items in one trip ought to be enough for anybody!
-    pub offset: usize,
+    pub count: ShoppingCount,
+    pub offset: IndexOffset,
 }
 
 pub struct FixedHungerAmountParams {
@@ -41,6 +51,7 @@ pub struct RandomEventParams {
 }
 
 pub enum EventSourceSpec {
+    BuyIfHalfEmpty(BuyIfHalfEmptyParams),
     BuyRandomVariety(BuyRandomVarietyParams),
     FixedHungerAmount(FixedHungerAmountParams),
     ShopSomeDays(ShopSomeDaysParams),
@@ -70,7 +81,7 @@ pub mod food {
 
     pub type Key = String;
 
-    #[derive(serde::Deserialize)]
+    #[derive(Clone, Debug, serde::Deserialize)]
     pub struct Option {
         pub grams: Grams,
     }
