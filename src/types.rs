@@ -9,16 +9,19 @@ pub type ShoppingCount = u16;
 
 pub type IndexOffset = usize;
 
+#[derive(Clone, Debug)]
 pub struct BuyIfHalfEmptyParams { 
     pub max_count: ShoppingCount,
     pub offset: IndexOffset,
 }
 
+#[derive(Debug)]
 pub struct BuyRandomVarietyParams { 
     pub count: ShoppingCount,
     pub offset: IndexOffset,
 }
 
+#[derive(Debug)]
 pub struct FixedHungerAmountParams {
     pub grams_per_day: food::Grams,
 }
@@ -41,15 +44,18 @@ impl RollOnePastMax {
     }
 }
 
+#[derive(Debug)]
 pub struct ShopSomeDaysParams {
     pub buy_count: u8,
     pub roll_one_past_max: RollOnePastMax,
 }
 
+#[derive(Debug)]
 pub struct RandomEventParams {
     pub roll_one_past_max: RollOnePastMax,
 }
 
+#[derive(Debug)]
 pub enum EventSourceSpec {
     BuyIfHalfEmpty(BuyIfHalfEmptyParams),
     BuyRandomVariety(BuyRandomVarietyParams),

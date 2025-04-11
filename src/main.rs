@@ -97,7 +97,20 @@ mod basic {
         perf: PerfSnapshot,
     }
 
-    fn simulate(study: &mut Shelf, event: Event) {
+    fn simulate(
+        rng: &mut Xs,
+        study: &mut Shelf,
+        food_types: &FoodTypes,
+        event: Event
+    ) {
+        macro_rules! buy {
+            ($food: expr) => {
+                // TODO handle money when that is implemented
+
+                study.shelf.push($food);
+            }
+        }
+
         match event {
             Event::Ate(key, grams, .. ) => {
                 fn eat_at(study: &mut Shelf, index: usize, grams: Grams) {
@@ -135,7 +148,36 @@ mod basic {
                 }
             },
             Event::Bought(food) => {
-                study.shelf.push(food);
+                buy!(food);
+            }
+            Event::BuyIfHalfEmpty(BuyIfHalfEmptyParams { max_count, offset }) => {
+                let len = study.shelf.len();
+                if len == 0 {
+                    // TODO? Fallback to another strat?
+                    return
+                }
+
+                let mut index = offset % len;
+                let count = core::cmp::min(
+                    ShoppingCount::MAX as usize,
+                    core::cmp::min(max_count as usize, len)
+                ) as ShoppingCount;
+
+                for _ in 0..count {
+                    let food = &study.shelf[index];
+                    if food.is_half_empty() {
+                        // TODO? avoid O(n^2) here?
+                        for type_ in food_types.iter() {
+                            if type_.key == food.key {
+                                buy!(Food::from_rng_of_type(&type_, rng));
+
+                                break
+                            }
+                        }
+                    }
+                    index += 1;
+                    index %= len;
+                }
             }
         }
     }
@@ -161,10 +203,11 @@ mod basic {
         stats
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     enum Event {
         Ate(food::Key, Grams),
         Bought(Food),
+        BuyIfHalfEmpty(BuyIfHalfEmptyParams)
     }
 
     impl Event {
@@ -203,50 +246,20 @@ mod basic {
 
         let mut events: Events = Vec::with_capacity(day_count);
 
-        struct EventSourceBundle<'events, 'rng, 'food_types, 'study> {
+        struct EventSourceBundle<'events, 'rng, 'food_types> {
             events: &'events mut Events,
             rng: &'rng mut Xs,
             food_types: &'food_types FoodTypes,
-            study: &'study Shelf,
         }
 
         fn buy_if_half_empty(
             EventSourceBundle {
                 events,
-                rng,
-                food_types,
-                study,
                 ..
             }: EventSourceBundle,
-            BuyIfHalfEmptyParams { max_count, offset }: &BuyIfHalfEmptyParams,
+            params: &BuyIfHalfEmptyParams,
         ) {
-            let len = study.shelf.len();
-            if len == 0 {
-                // TODO? Fallback to another strat?
-                return
-            }
-
-            let mut index = offset % len;
-            let count = core::cmp::min(
-                ShoppingCount::MAX as usize,
-                core::cmp::min((*max_count) as usize, len)
-            ) as ShoppingCount;
-
-            for _ in 0..count {
-                let food = &study.shelf[index];
-                if food.is_half_empty() {
-                    // TODO? avoid O(n^2) here?
-                    for type_ in food_types.iter() {
-                        if type_.key == food.key {
-                            events.push(Event::Bought(Food::from_rng_of_type(&type_, rng)));
-
-                            break
-                        }
-                    }
-                }
-                index += 1;
-                index %= len;
-            }
+            events.push(Event::BuyIfHalfEmpty(params.clone()));
         }
 
         fn buy_random_variety(
@@ -345,7 +358,6 @@ mod basic {
                     events: &mut events,
                     rng: &mut rng,
                     food_types: &food_types,
-                    study: &study,
                 }
             }
         }
@@ -376,7 +388,7 @@ mod basic {
         for event in events {
             all_stats.push(stats(&study));
 
-            simulate(&mut study, event);
+            simulate(&mut rng, &mut study, &food_types, event);
         }
 
         writeln!(w, "grams: [")?;
