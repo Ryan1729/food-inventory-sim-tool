@@ -151,32 +151,25 @@ mod basic {
                 buy!(food);
             }
             Event::BuyIfHalfEmpty(BuyIfHalfEmptyParams { max_count, offset }) => {
-                let len = study.shelf.len();
-                if len == 0 {
-                    // TODO? Fallback to another strat?
-                    return
-                }
+                // buy one of each kind of food if there isn't a more than half empty version of it there.
+                let mut count = 0;
 
-                let mut index = offset % len;
-                let count = core::cmp::min(
-                    ShoppingCount::MAX as usize,
-                    core::cmp::min(max_count as usize, len)
-                ) as ShoppingCount;
+                for type_ in food_types.iter() {
+                    let mut have_half_full = false;
 
-                for _ in 0..count {
-                    let food = &study.shelf[index];
-                    if food.is_half_empty() {
-                        // TODO? avoid O(n^2) here?
-                        for type_ in food_types.iter() {
-                            if type_.key == food.key {
-                                buy!(Food::from_rng_of_type(&type_, rng));
-
-                                break
-                            }
+                    // TODO? avoid O(n^2) here?
+                    for i in 0..study.shelf.len() {
+                        let food = &study.shelf[(i + offset) % study.shelf.len()];
+                        if type_.key == food.key && !food.is_half_empty() {
+                            have_half_full = true;
+                            break
                         }
                     }
-                    index += 1;
-                    index %= len;
+
+                    if !have_half_full && count < max_count {
+                        buy!(Food::from_rng_of_type(&type_, rng));
+                        count += 1;
+                    }
                 }
             }
         }

@@ -15,6 +15,25 @@ Spec(
                 ),
             ],
         ),
+        Type (
+            key: "Peanut Butter",
+            options: [
+                Option (
+                    grams: 1000,
+                ),
+                Option (
+                    grams: 2000,
+                ),
+            ],
+        ),
+        Type (
+            key: "Bread",
+            options: [
+                Option (
+                    grams: 600,
+                ),
+            ],
+        ),
     ],
     initial_event_source_specs: [
         (
