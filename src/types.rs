@@ -103,6 +103,9 @@ pub mod food {
 pub struct Spec {
     pub mode: Mode,
     pub seed: Option<Seed>,
+    pub hide_summary: bool,
+    pub show_grams: bool,
+    pub show_items: bool,
 }
 
 pub type Res<A> = Result<A, Box<dyn std::error::Error>>;

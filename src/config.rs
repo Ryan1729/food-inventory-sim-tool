@@ -116,6 +116,14 @@ struct RawSpec {
     pub initial_event_source_specs: Vec<RawEventSourceSpec>,
     #[serde(default)]
     pub repeated_event_source_specs: Vec<RawEventSourceSpec>,
+    // Output Flags section
+    // Designed such that all false is a good default.
+    #[serde(default)]
+    pub hide_summary: bool,
+    #[serde(default)]
+    pub show_grams: bool,
+    #[serde(default)]
+    pub show_items: bool,
 }
 
 pub fn get_spec() -> Res<Spec> {
@@ -141,6 +149,10 @@ pub fn get_spec() -> Res<Spec> {
     let mut spec = Spec::default();
 
     spec.seed = unvalidated_spec.seed;
+
+    spec.hide_summary = unvalidated_spec.hide_summary;
+    spec.show_grams = unvalidated_spec.show_grams;
+    spec.show_items = unvalidated_spec.show_items;
 
     spec.mode = match &unvalidated_spec.mode {
         RawMode::Minimal => {

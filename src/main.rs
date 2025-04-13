@@ -384,33 +384,41 @@ mod basic {
             simulate(&mut rng, &mut study, &food_types, event);
         }
 
-        writeln!(w, "grams: [")?;
-        for stats in &all_stats {
-            writeln!(w, "    {}", stats.total_grams)?;
-        }
-        writeln!(w, "]")?;
+        if spec.show_grams {
+            writeln!(w, "grams: [")?;
+            for stats in &all_stats {
+                writeln!(w, "    {}", stats.total_grams)?;
+            }
+            writeln!(w, "]")?;
 
-        writeln!(w, "")?;
-
-        writeln!(w, "items: [")?;
-        for stats in &all_stats {
-            writeln!(w, "    {}", stats.total_items)?;
-        }
-        writeln!(w, "]")?;
-
-        let mut performance: Performance = 0;
-        let mut out_count: Grams = 0;
-        let mut starved_count: u16 = 0;
-
-        for stats in &all_stats {
-            performance = core::cmp::max(performance, stats.snapshot.performance());
-            out_count = core::cmp::max(out_count, stats.snapshot.out_count);
-            starved_count = core::cmp::max(starved_count, stats.snapshot.starved_count);
+            writeln!(w, "")?;
         }
 
-        writeln!(w, "out_count (closer to 0 is better): {out_count}")?;
-        writeln!(w, "starved_count (closer to 0 is better): {starved_count}\n")?;
-        writeln!(w, "performance (closer to 0 is better): {performance},")?;
+        if spec.show_items {
+            writeln!(w, "items: [")?;
+            for stats in &all_stats {
+                writeln!(w, "    {}", stats.total_items)?;
+            }
+            writeln!(w, "]")?;
+
+            writeln!(w, "")?;
+        }
+
+        if !spec.hide_summary {
+            let mut performance: Performance = 0;
+            let mut out_count: Grams = 0;
+            let mut starved_count: u16 = 0;
+    
+            for stats in &all_stats {
+                performance = core::cmp::max(performance, stats.snapshot.performance());
+                out_count = core::cmp::max(out_count, stats.snapshot.out_count);
+                starved_count = core::cmp::max(starved_count, stats.snapshot.starved_count);
+            }
+    
+            writeln!(w, "out_count (closer to 0 is better): {out_count}")?;
+            writeln!(w, "starved_count (closer to 0 is better): {starved_count}\n")?;
+            writeln!(w, "performance (closer to 0 is better): {performance},")?;
+        }
 
         Ok(())
     }
