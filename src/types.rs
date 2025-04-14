@@ -106,6 +106,7 @@ pub struct Spec {
     pub hide_summary: bool,
     pub show_grams: bool,
     pub show_items: bool,
+    pub show_step_by_step: bool,
 }
 
 pub type Res<A> = Result<A, Box<dyn std::error::Error>>;

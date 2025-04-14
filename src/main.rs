@@ -97,9 +97,15 @@ mod basic {
         perf: PerfSnapshot,
     }
 
+    enum TrackingStep {
+        Ate(Grams, food::Key),
+        Bought(Grams, food::Key),
+    }
+
     fn simulate(
         rng: &mut Xs,
         study: &mut Shelf,
+        tracking_steps: &mut Vec<TrackingStep>,
         food_types: &FoodTypes,
         event: Event
     ) {
@@ -107,13 +113,21 @@ mod basic {
             ($food: expr) => {
                 // TODO handle money when that is implemented
 
-                study.shelf.push($food);
+                let food = $food;
+
+                tracking_steps.push(TrackingStep::Bought(food.grams, food.key.clone()));
+                study.shelf.push(food);
             }
         }
 
         match event {
             Event::Ate(key, grams, .. ) => {
-                fn eat_at(study: &mut Shelf, index: usize, grams: Grams) {
+                fn eat_at(
+                    study: &mut Shelf,
+                    tracking_steps: &mut Vec<TrackingStep>,
+                    index: usize,
+                    grams: Grams
+                ) {
                     if index >= study.shelf.len() {
                         study.perf.starved_count += 1;
                         return
@@ -122,8 +136,10 @@ mod basic {
                     if let Some(subtracted) = food.grams.checked_sub(grams) {
                         // Base case
                         food.grams = subtracted;
+                        tracking_steps.push(TrackingStep::Ate(grams, food.key.clone()));
                     } else {
                         let remaining_grams = grams - food.grams;
+                        tracking_steps.push(TrackingStep::Ate(food.grams, food.key.clone()));
                         study.perf.out_count += remaining_grams;
                         food.grams = 0;
 
@@ -132,19 +148,19 @@ mod basic {
                         // TODO? Allow configuring this? Make random an option?
                         let arbitrary_index = 0;
 
-                        eat_at(study, arbitrary_index, remaining_grams);
+                        eat_at(study, tracking_steps, arbitrary_index, remaining_grams);
                     }
                 }
 
                 if let Some(index) = study.shelf.iter().position(|f| f.key == key) {
-                    eat_at(study, index, grams);
+                    eat_at(study, tracking_steps, index, grams);
                 } else {
                     study.perf.out_count += grams;
 
                     // TODO? Allow configuring this? Make random an option?
                     let arbitrary_index = 0;
 
-                    eat_at(study, arbitrary_index, grams);
+                    eat_at(study, tracking_steps, arbitrary_index, grams);
                 }
             },
             Event::Bought(food) => {
@@ -215,6 +231,12 @@ mod basic {
         }
     }
 
+    #[derive(Clone, Debug)]
+    enum EventEntry {
+        DayMarker,
+        Event(Event),
+    }
+
     pub fn run(spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
         let crate::types::BasicExtras {
             food_types,
@@ -235,48 +257,51 @@ mod basic {
 
         let day_count = (xs::range(&mut rng, 1..2) * 7) as usize;
 
-        type Events = Vec<Event>;
+        type Events = Vec<EventEntry>;
 
         let mut events: Events = Vec::with_capacity(day_count);
 
-        struct EventSourceBundle<'events, 'rng, 'food_types> {
-            events: &'events mut Events,
+        struct EventSourceBundle<'rng, 'food_types, F>
+        where
+            F: FnMut(Event)
+        {
+            push_event: F,
             rng: &'rng mut Xs,
             food_types: &'food_types FoodTypes,
         }
 
-        fn buy_if_half_empty(
+        fn buy_if_half_empty<F: FnMut(Event)>(
             EventSourceBundle {
-                events,
+                mut push_event,
                 ..
-            }: EventSourceBundle,
+            }: EventSourceBundle<F>,
             params: &BuyIfHalfEmptyParams,
         ) {
-            events.push(Event::BuyIfHalfEmpty(params.clone()));
+            push_event(Event::BuyIfHalfEmpty(params.clone()));
         }
 
-        fn buy_random_variety(
+        fn buy_random_variety<F: FnMut(Event)>(
             EventSourceBundle {
-                events,
+                mut push_event,
                 rng,
                 food_types,
                 ..
-            }: EventSourceBundle,
+            }: EventSourceBundle<F>,
             BuyRandomVarietyParams { count, offset }: &BuyRandomVarietyParams,
         ) {
             for i in 0..*count {
                 let index = (i as usize).wrapping_add(*offset) % food_types.len();
-                events.push(Event::Bought(Food::from_rng_of_type(&food_types[index], rng)));
+                push_event(Event::Bought(Food::from_rng_of_type(&food_types[index], rng)));
             }
         }
 
-        fn fixed_hunger_amount(
+        fn fixed_hunger_amount<F: FnMut(Event)>(
             EventSourceBundle {
-                events,
+                mut push_event,
                 rng,
                 food_types,
                 ..
-            }: EventSourceBundle,
+            }: EventSourceBundle<F>,
             FixedHungerAmountParams { grams_per_day }: &FixedHungerAmountParams,
         ) {
             let mut grams_remaining = *grams_per_day;
@@ -288,7 +313,7 @@ mod basic {
                 // TODO Define a serving on each food type, and eat say 1.5 to 2.5 of them each time
                 let amount = xs::range(rng, 1..(grams_remaining as u32 + 1)) as Grams;
 
-                events.push(Event::Ate(
+                push_event(Event::Ate(
                     type_.key.clone(),
                     amount,
                 ));
@@ -299,13 +324,13 @@ mod basic {
 
         // TODO An actual reasonable purchase strategy
         //    Something based on the threshold of how much of each food we have left
-        fn shop_some_days(
+        fn shop_some_days<F: FnMut(Event)>(
             EventSourceBundle {
-                events,
+                mut push_event,
                 rng,
                 food_types,
                 ..
-            }: EventSourceBundle,
+            }: EventSourceBundle<F>,
             ShopSomeDaysParams {
                 buy_count,
                 roll_one_past_max,
@@ -316,7 +341,7 @@ mod basic {
                     // Go shopping
                     // TODO Count grams and buy a set amount of grams instead of an item count?
                     for _ in 0..*buy_count {
-                        events.push(Event::Bought(Food::from_rng(food_types, rng)));
+                        push_event(Event::Bought(Food::from_rng(food_types, rng)));
                     }
                 },
                 _ => {
@@ -325,13 +350,13 @@ mod basic {
             }
         }
 
-        fn random_event(
+        fn random_event<F: FnMut(Event)>(
             EventSourceBundle {
-                events,
+                mut push_event,
                 rng,
                 food_types,
                 ..
-            }: EventSourceBundle,
+            }: EventSourceBundle<F>,
             RandomEventParams {
                 roll_one_past_max,
             }: &RandomEventParams,
@@ -339,7 +364,7 @@ mod basic {
             // Have random things happen sometimes as an attempt to capture things not explicitly modeled
             match xs::range(rng, 0..roll_one_past_max.u32()) {
                 0 => {
-                    events.push(Event::from_rng(food_types, rng));
+                    push_event(Event::from_rng(food_types, rng));
                 },
                 _ => {}
             }
@@ -348,7 +373,7 @@ mod basic {
         macro_rules! b {
             () => {
                 EventSourceBundle {
-                    events: &mut events,
+                    push_event: |e| events.push(EventEntry::Event(e)),
                     rng: &mut rng,
                     food_types: &food_types,
                 }
@@ -372,17 +397,62 @@ mod basic {
         get_events!(initial_event_source_specs);
 
         for _ in 0..day_count {
+            events.push(EventEntry::DayMarker);
+
+            // TODO Add day markers to the event stream
             get_events!(repeated_event_source_specs);
         }
         assert!(events.len() > food_types.len());
 
         let mut all_stats = Vec::with_capacity(events.len() + 1);
 
-        for event in events {
-            all_stats.push(stats(&study));
+        let mut tracking_steps = Vec::with_capacity(16);
 
-            simulate(&mut rng, &mut study, &food_types, event);
+        for event_entry in events {
+            match event_entry {
+                EventEntry::DayMarker => {
+                    if spec.show_step_by_step {
+                        writeln!(w, "======= End of Day ==========")?;
+                        // TODO Once we have day markers in the event stream, indicate them, 
+                        // and include totals ate and bought and for the previous day.
+        
+                        // TODO indicate where running out and starvation happen
+                    }
+                },
+                EventEntry::Event(event) => {
+                    all_stats.push(stats(&study));
+
+                    tracking_steps.clear();
+        
+                    simulate(
+                        &mut rng,
+                        &mut study,
+                        &mut tracking_steps,
+                        &food_types,
+                        event
+                    );
+        
+                    if spec.show_step_by_step {
+                        use TrackingStep::*;
+                        for step in &tracking_steps {
+                            match step {
+                                Ate(grams, key) => {
+                                    writeln!(w, "Ate {grams}g of {key}")?;
+                                },
+                                Bought(grams, key) => {
+                                    writeln!(w, "Bought {grams}g of {key}")?;
+                                },
+                            }
+                        }
+                    }
+                },
+            }
         }
+
+        if spec.show_step_by_step {
+            writeln!(w, "")?;
+        }
+        drop(tracking_steps);
 
         if spec.show_grams {
             writeln!(w, "grams: [")?;

@@ -124,6 +124,8 @@ struct RawSpec {
     pub show_grams: bool,
     #[serde(default)]
     pub show_items: bool,
+    #[serde(default)]
+    pub show_step_by_step: bool,
 }
 
 pub fn get_spec() -> Res<Spec> {
@@ -148,11 +150,12 @@ pub fn get_spec() -> Res<Spec> {
 
     let mut spec = Spec::default();
 
-    spec.seed = unvalidated_spec.seed;
-
-    spec.hide_summary = unvalidated_spec.hide_summary;
-    spec.show_grams = unvalidated_spec.show_grams;
-    spec.show_items = unvalidated_spec.show_items;
+    macro_rules! assign {
+        ($($field: ident)+) => {
+            $( spec.$field = unvalidated_spec.$field; )+
+        }
+    }
+    assign!(seed hide_summary show_grams show_items show_step_by_step);
 
     spec.mode = match &unvalidated_spec.mode {
         RawMode::Minimal => {
