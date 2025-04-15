@@ -98,7 +98,8 @@ mod basic {
     }
 
     enum TrackingStep {
-        Ate(Grams, food::Key),
+        Starved(Grams),
+        Ate { eaten: Grams, key: food::Key, out_count: Grams },
         Bought(Grams, food::Key),
     }
 
@@ -130,16 +131,25 @@ mod basic {
                 ) {
                     if index >= study.shelf.len() {
                         study.perf.starved_count += 1;
+                        tracking_steps.push(TrackingStep::Starved(grams));
                         return
                     }
                     let food = &mut study.shelf[index];
                     if let Some(subtracted) = food.grams.checked_sub(grams) {
                         // Base case
                         food.grams = subtracted;
-                        tracking_steps.push(TrackingStep::Ate(grams, food.key.clone()));
+                        tracking_steps.push(TrackingStep::Ate {
+                            eaten: food.grams,
+                            key: food.key.clone(),
+                            out_count: 0,
+                        });
                     } else {
                         let remaining_grams = grams - food.grams;
-                        tracking_steps.push(TrackingStep::Ate(food.grams, food.key.clone()));
+                        tracking_steps.push(TrackingStep::Ate {
+                            eaten: food.grams,
+                            key: food.key.clone(),
+                            out_count: remaining_grams,
+                        });
                         study.perf.out_count += remaining_grams;
                         food.grams = 0;
 
@@ -233,6 +243,7 @@ mod basic {
 
     #[derive(Clone, Debug)]
     enum EventEntry {
+        InitialDayMarker,
         DayMarker,
         Event(Event),
     }
@@ -396,11 +407,12 @@ mod basic {
 
         get_events!(initial_event_source_specs);
 
-        for _ in 0..day_count {
-            events.push(EventEntry::DayMarker);
+        events.push(EventEntry::InitialDayMarker);
 
-            // TODO Add day markers to the event stream
+        for _ in 0..day_count {
             get_events!(repeated_event_source_specs);
+
+            events.push(EventEntry::DayMarker);
         }
         assert!(events.len() > food_types.len());
 
@@ -408,15 +420,24 @@ mod basic {
 
         let mut tracking_steps = Vec::with_capacity(16);
 
+        let mut daily_ate_total = 0;
+        let mut daily_bought_total = 0;
+
         for event_entry in events {
             match event_entry {
+                EventEntry::InitialDayMarker => {
+                    if spec.show_step_by_step {
+                        writeln!(w, "======= Start of the First Day ==========")?;
+                    }
+                }
                 EventEntry::DayMarker => {
                     if spec.show_step_by_step {
-                        writeln!(w, "======= End of Day ==========")?;
-                        // TODO Once we have day markers in the event stream, indicate them, 
-                        // and include totals ate and bought and for the previous day.
-        
-                        // TODO indicate where running out and starvation happen
+                        writeln!(w, "============= End of Day ================")?;
+                        writeln!(w, "Ate: {daily_ate_total}")?;
+                        writeln!(w, "Bought: {daily_bought_total}")?;
+                        writeln!(w, "=========================================")?;
+                        daily_ate_total = 0;
+                        daily_bought_total = 0;
                     }
                 },
                 EventEntry::Event(event) => {
@@ -436,11 +457,21 @@ mod basic {
                         use TrackingStep::*;
                         for step in &tracking_steps {
                             match step {
-                                Ate(grams, key) => {
-                                    writeln!(w, "Ate {grams}g of {key}")?;
+                                Starved(grams) => {
+                                    writeln!(w, "Starved by {grams}g")?;
+                                }
+                                Ate { eaten, key, out_count } => {
+                                    writeln!(w, "Ate {eaten}g of {key}")?;
+
+                                    if *out_count > 0 {
+                                        writeln!(w, "    Ran out by {out_count}g")?;
+                                    }
+                                    
+                                    daily_ate_total += eaten;
                                 },
                                 Bought(grams, key) => {
                                     writeln!(w, "Bought {grams}g of {key}")?;
+                                    daily_bought_total += grams;
                                 },
                             }
                         }
