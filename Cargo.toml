@@ -8,3 +8,27 @@ config = { version = "0.15.11", features=["ron"] }
 serde = "1.0.219"
 vec1 = { version = "1.12.1", features=["serde"] }
 xflags = "0.3.2"
+
+# We aim for fast to compile, with the dev profile. At this time, `opt-level = 2`
+# seems to help with that goal.
+[profile.dev]
+opt-level = 3
+debug = false
+rpath = false
+lto = false
+debug-assertions = true
+
+[profile.debugging]
+inherits = "dev"
+opt-level = 0
+debug = true
+
+[profile.release]
+strip = true
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+# This noticably decreases code size
+codegen-units = 1

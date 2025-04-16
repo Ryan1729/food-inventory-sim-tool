@@ -97,6 +97,7 @@ mod basic {
         perf: PerfSnapshot,
     }
 
+    #[derive(Debug)]
     enum TrackingStep {
         Starved(Grams),
         Ate { eaten: Grams, key: food::Key, out_count: Grams },
@@ -139,7 +140,7 @@ mod basic {
                         // Base case
                         food.grams = subtracted;
                         tracking_steps.push(TrackingStep::Ate {
-                            eaten: food.grams,
+                            eaten: grams,
                             key: food.key.clone(),
                             out_count: 0,
                         });
@@ -333,8 +334,6 @@ mod basic {
             }
         }
 
-        // TODO An actual reasonable purchase strategy
-        //    Something based on the threshold of how much of each food we have left
         fn shop_some_days<F: FnMut(Event)>(
             EventSourceBundle {
                 mut push_event,
@@ -444,7 +443,7 @@ mod basic {
                     all_stats.push(stats(&study));
 
                     tracking_steps.clear();
-        
+
                     simulate(
                         &mut rng,
                         &mut study,
