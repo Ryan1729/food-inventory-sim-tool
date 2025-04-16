@@ -427,6 +427,8 @@ mod basic {
                 EventEntry::InitialDayMarker => {
                     if spec.show_step_by_step {
                         writeln!(w, "======= Start of the First Day ==========")?;
+                        daily_ate_total = 0;
+                        daily_bought_total = 0;
                     }
                 }
                 EventEntry::DayMarker => {
