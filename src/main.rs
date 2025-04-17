@@ -68,8 +68,8 @@ mod basic {
             }
         }
 
-        pub fn is_half_empty(&self) -> bool {
-            self.grams <= (self.option.grams / 2)
+        pub fn is_at_least_this_full(&self, fullness_threshold: FullnessThreshold) -> bool {
+            self.grams as f32 >= (self.option.grams as f32 * fullness_threshold)
         }
     }
 
@@ -177,23 +177,32 @@ mod basic {
             Event::Bought(food) => {
                 buy!(food);
             }
-            Event::BuyIfHalfEmpty(BuyIfHalfEmptyParams { max_count, offset }) => {
-                // buy one of each kind of food if there isn't a more than half empty version of it there.
+            // TODO add a event source that exposes the fullness_threshold param.
+            // TODO Can we find the best value for that param, under a given set of other params?
+            //    How to expose searching for that as a setting?
+            Event::BuyAllBasedOnFullness(
+                BuyAllBasedOnFullnessParams {
+                    max_count,
+                    offset,
+                    fullness_threshold
+                }
+            ) => {
+                // buy one of each kind of food if there isn't a more than fullness_threshold full version of it there.
                 let mut count = 0;
 
                 for type_ in food_types.iter() {
-                    let mut have_half_full = false;
+                    let mut have_full_enough = false;
 
                     // TODO? avoid O(n^2) here?
                     for i in 0..study.shelf.len() {
                         let food = &study.shelf[(i + offset) % study.shelf.len()];
-                        if type_.key == food.key && !food.is_half_empty() {
-                            have_half_full = true;
+                        if type_.key == food.key && food.is_at_least_this_full(fullness_threshold) {
+                            have_full_enough = true;
                             break
                         }
                     }
 
-                    if !have_half_full && count < max_count {
+                    if !have_full_enough && count < max_count {
                         buy!(Food::from_rng_of_type(&type_, rng));
                         count += 1;
                     }
@@ -223,11 +232,20 @@ mod basic {
         stats
     }
 
+    type FullnessThreshold = f32;
+
+    #[derive(Clone, Debug)]
+    struct BuyAllBasedOnFullnessParams {
+        max_count: ShoppingCount,
+        offset: IndexOffset,
+        fullness_threshold: FullnessThreshold,
+    }
+
     #[derive(Clone, Debug)]
     enum Event {
         Ate(food::Key, Grams),
         Bought(Food),
-        BuyIfHalfEmpty(BuyIfHalfEmptyParams)
+        BuyAllBasedOnFullness(BuyAllBasedOnFullnessParams)
     }
 
     impl Event {
@@ -289,7 +307,11 @@ mod basic {
             }: EventSourceBundle<F>,
             params: &BuyIfHalfEmptyParams,
         ) {
-            push_event(Event::BuyIfHalfEmpty(params.clone()));
+            push_event(Event::BuyAllBasedOnFullness(BuyAllBasedOnFullnessParams {
+                max_count: params.max_count,
+                offset: params.offset,
+                fullness_threshold: 0.5,
+            }));
         }
 
         fn buy_random_variety<F: FnMut(Event)>(
