@@ -9,6 +9,15 @@ pub type ShoppingCount = u16;
 
 pub type IndexOffset = usize;
 
+pub type FullnessThreshold = f32;
+
+#[derive(Clone, Debug)]
+pub struct BuyAllBasedOnFullnessParams {
+    pub max_count: ShoppingCount,
+    pub offset: IndexOffset,
+    pub fullness_threshold: FullnessThreshold,
+}
+
 #[derive(Clone, Debug)]
 pub struct BuyIfHalfEmptyParams { 
     pub max_count: ShoppingCount,
@@ -55,14 +64,40 @@ pub struct RandomEventParams {
     pub roll_one_past_max: RollOnePastMax,
 }
 
-#[derive(Debug)]
-pub enum EventSourceSpec {
+macro_rules! ess_def {
+    (
+        $($variant: ident ($params: ident) $(,)? )+
+    ) => {
+        #[derive(Debug)]
+        pub enum EventSourceSpec {
+            $( $variant($params), )+
+        }
+
+        #[derive(Debug, serde::Deserialize)]
+        pub enum RawEventSourceSpecKind {
+            $( $variant, )+
+        }
+    }
+}
+
+ess_def!{
+    BuyIfBelowThreshold(BuyAllBasedOnFullnessParams),
     BuyIfHalfEmpty(BuyIfHalfEmptyParams),
     BuyRandomVariety(BuyRandomVarietyParams),
     FixedHungerAmount(FixedHungerAmountParams),
     ShopSomeDays(ShopSomeDaysParams),
     RandomEvent(RandomEventParams),
 }
+
+//#[derive(Debug)]
+//pub enum EventSourceSpec {
+    //BuyIfBelowThreshold(BuyAllBasedOnFullnessParams),
+    //BuyIfHalfEmpty(BuyIfHalfEmptyParams),
+    //BuyRandomVariety(BuyRandomVarietyParams),
+    //FixedHungerAmount(FixedHungerAmountParams),
+    //ShopSomeDays(ShopSomeDaysParams),
+    //RandomEvent(RandomEventParams),
+//}
 
 pub struct BasicExtras {
     pub food_types: FoodTypes,

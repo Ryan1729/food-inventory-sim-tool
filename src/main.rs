@@ -177,9 +177,6 @@ mod basic {
             Event::Bought(food) => {
                 buy!(food);
             }
-            // TODO add a event source that exposes the fullness_threshold param.
-            // TODO Can we find the best value for that param, under a given set of other params?
-            //    How to expose searching for that as a setting?
             Event::BuyAllBasedOnFullness(
                 BuyAllBasedOnFullnessParams {
                     max_count,
@@ -230,15 +227,6 @@ mod basic {
         stats.total_items = shelf.shelf.len();
 
         stats
-    }
-
-    type FullnessThreshold = f32;
-
-    #[derive(Clone, Debug)]
-    struct BuyAllBasedOnFullnessParams {
-        max_count: ShoppingCount,
-        offset: IndexOffset,
-        fullness_threshold: FullnessThreshold,
     }
 
     #[derive(Clone, Debug)]
@@ -298,6 +286,19 @@ mod basic {
             push_event: F,
             rng: &'rng mut Xs,
             food_types: &'food_types FoodTypes,
+        }
+
+        // TODO Can we find the best value for the fullness_threshold param, under a given set of other params?
+        //    How to expose searching for that as a setting?
+        //        BasicSearch as a mode, and todo!()s as needed
+        fn buy_if_below_threshold<F: FnMut(Event)>(
+            EventSourceBundle {
+                mut push_event,
+                ..
+            }: EventSourceBundle<F>,
+            params: &BuyAllBasedOnFullnessParams,
+        ) {
+            push_event(Event::BuyAllBasedOnFullness(params.clone()));
         }
 
         fn buy_if_half_empty<F: FnMut(Event)>(
@@ -416,6 +417,7 @@ mod basic {
             ($es_specs: expr) => {
                 for es_spec in $es_specs.iter() {
                     match es_spec {
+                        EventSourceSpec::BuyIfBelowThreshold(p) => buy_if_below_threshold(b!(), &p),
                         EventSourceSpec::BuyIfHalfEmpty(p) => buy_if_half_empty(b!(), &p),
                         EventSourceSpec::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
                         EventSourceSpec::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),

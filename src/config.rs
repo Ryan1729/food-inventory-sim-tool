@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicExtras, FoodTypes, Mode, Res, RollOnePastMax, Seed, Spec};
+use crate::types::{self, food, BasicExtras, FoodTypes, Mode, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, Spec};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -78,15 +78,6 @@ impl core::fmt::Display for RawMode {
 }
 
 #[derive(Debug, serde::Deserialize)]
-enum RawEventSourceSpecKind {
-    BuyIfHalfEmpty,
-    BuyRandomVariety,
-    FixedHungerAmount,
-    ShopSomeDays,
-    RandomEvent,
-}
-
-#[derive(Debug, serde::Deserialize)]
 struct RawEventSourceSpec {
     pub kind: RawEventSourceSpecKind,
     // All of the fields from all of the params
@@ -102,6 +93,8 @@ struct RawEventSourceSpec {
     pub offset: usize,
     #[serde(default)]
     pub roll_one_past_max: RollOnePastMax,
+    #[serde(default)]
+    pub fullness_threshold: types::FullnessThreshold,
 }
 
 #[derive(serde::Deserialize)]
@@ -215,8 +208,10 @@ pub fn get_spec() -> Res<Spec> {
                     let mut specs_vec = Vec::with_capacity(specs.len());
 
                     for i in 0..specs.len() {
-                        use RawEventSourceSpecKind::*;
-                        use crate::types::EventSourceSpec as ESS;
+                        use crate::types::{
+                            EventSourceSpec as ESS,
+                            RawEventSourceSpecKind::*
+                        };
 
                         let e_s_spec = &specs[i];
 
@@ -226,9 +221,23 @@ pub fn get_spec() -> Res<Spec> {
                             ShopSomeDaysParams,
                             BuyRandomVarietyParams,
                             BuyIfHalfEmptyParams,
+                            BuyAllBasedOnFullnessParams,
                         };
 
                         match e_s_spec.kind {
+                            BuyIfBelowThreshold => {
+                                excess_data_check!(
+                                    specs[i] $error_key : grams_per_day buy_count roll_one_past_max count
+                                );
+
+                                specs_vec.push(
+                                    ESS::BuyIfBelowThreshold(BuyAllBasedOnFullnessParams {
+                                        max_count: e_s_spec.max_count,
+                                        offset: e_s_spec.offset,
+                                        fullness_threshold: e_s_spec.fullness_threshold,
+                                    })
+                                );
+                            },
                             BuyIfHalfEmpty => {
                                 excess_data_check!(
                                     specs[i] $error_key : grams_per_day buy_count roll_one_past_max count
@@ -240,7 +249,7 @@ pub fn get_spec() -> Res<Spec> {
                                         offset: e_s_spec.offset,
                                     })
                                 );
-                            }
+                            },
                             BuyRandomVariety => {
                                 excess_data_check!(
                                     specs[i] $error_key : grams_per_day buy_count roll_one_past_max max_count
