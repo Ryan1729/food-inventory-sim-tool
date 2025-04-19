@@ -24,13 +24,13 @@ pub struct BuyIfHalfEmptyParams {
     pub offset: IndexOffset,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BuyRandomVarietyParams { 
     pub count: ShoppingCount,
     pub offset: IndexOffset,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FixedHungerAmountParams {
     pub grams_per_day: food::Grams,
 }
@@ -53,13 +53,13 @@ impl RollOnePastMax {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ShopSomeDaysParams {
     pub buy_count: u8,
     pub roll_one_past_max: RollOnePastMax,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RandomEventParams {
     pub roll_one_past_max: RollOnePastMax,
 }
@@ -68,7 +68,7 @@ macro_rules! ess_def {
     (
         $($variant: ident ($params: ident) $(,)? )+
     ) => {
-        #[derive(Debug)]
+        #[derive(Clone, Debug)]
         pub enum EventSourceSpec {
             $( $variant($params), )+
         }
@@ -89,16 +89,7 @@ ess_def!{
     RandomEvent(RandomEventParams),
 }
 
-//#[derive(Debug)]
-//pub enum EventSourceSpec {
-    //BuyIfBelowThreshold(BuyAllBasedOnFullnessParams),
-    //BuyIfHalfEmpty(BuyIfHalfEmptyParams),
-    //BuyRandomVariety(BuyRandomVarietyParams),
-    //FixedHungerAmount(FixedHungerAmountParams),
-    //ShopSomeDays(ShopSomeDaysParams),
-    //RandomEvent(RandomEventParams),
-//}
-
+#[derive(Clone, Debug)]
 pub struct BasicExtras {
     pub food_types: FoodTypes,
     pub initial_event_source_specs: Vec1<EventSourceSpec>,
@@ -110,6 +101,7 @@ pub enum Mode {
     #[default]
     Minimal,
     Basic(BasicExtras),
+    BasicSearch(BasicExtras),
 }
 
 pub type Seed = [u8; 16];
@@ -127,7 +119,7 @@ pub mod food {
         pub grams: Grams,
     }
 
-    #[derive(serde::Deserialize)]
+    #[derive(Clone, Debug, serde::Deserialize)]
     pub struct Type {
         pub key: Key,
         pub options: Vec1<Option>,

@@ -1,4 +1,5 @@
 mod xs;
+mod minimize;
 mod types;
 use types::{Mode, Res, Spec};
 mod config;
@@ -73,7 +74,7 @@ mod basic {
         }
     }
 
-    type Performance = u32;
+    pub type Performance = u32;
 
     /// A snapshot of the data needed to evaluate the performance metric(s) of the given set of events.
     /// That is, how well those events achieve some goal, not how long it took to simulate them.
@@ -255,7 +256,11 @@ mod basic {
         Event(Event),
     }
 
-    pub fn run(spec: &Spec, mut w: impl Write) -> Result<(), std::io::Error> {
+    pub struct RunOutput {
+        pub performance: Performance,
+    }
+
+    pub fn run(spec: &Spec, mut w: impl Write) -> Result<RunOutput, std::io::Error> {
         let crate::types::BasicExtras {
             food_types,
             initial_event_source_specs,
@@ -264,7 +269,10 @@ mod basic {
             crate::Mode::Basic(extras) => {
                 extras
             },
-            _ => {
+            crate::Mode::BasicSearch(extras) => {
+                extras
+            },
+            crate::Mode::Minimal => {
                 panic!("TODO get rid of this case?");
             }
         };
@@ -530,28 +538,32 @@ mod basic {
             writeln!(w, "")?;
         }
 
+        let mut performance: Performance = 0;
+        let mut out_count: Grams = 0;
+        let mut starved_count: u16 = 0;
+
+        for stats in &all_stats {
+            performance = core::cmp::max(performance, stats.snapshot.performance());
+            out_count = core::cmp::max(out_count, stats.snapshot.out_count);
+            starved_count = core::cmp::max(starved_count, stats.snapshot.starved_count);
+        }
+
         if !spec.hide_summary {
-            let mut performance: Performance = 0;
-            let mut out_count: Grams = 0;
-            let mut starved_count: u16 = 0;
-    
-            for stats in &all_stats {
-                performance = core::cmp::max(performance, stats.snapshot.performance());
-                out_count = core::cmp::max(out_count, stats.snapshot.out_count);
-                starved_count = core::cmp::max(starved_count, stats.snapshot.starved_count);
-            }
-    
             writeln!(w, "out_count (closer to 0 is better): {out_count}")?;
             writeln!(w, "starved_count (closer to 0 is better): {starved_count}\n")?;
             writeln!(w, "performance (closer to 0 is better): {performance},")?;
         }
 
-        Ok(())
+        Ok(RunOutput {
+            performance,
+        })
     }
 }
 
 fn main() -> Res<()> {
     use Mode::*;
+    use std::io::Write;
+
     let spec: Spec = config::get_spec()?;
 
     let output = std::io::stdout();
@@ -562,6 +574,70 @@ fn main() -> Res<()> {
         }
         Basic { .. } => {
             basic::run(&spec, &output)?;
+        }
+        BasicSearch(extras) => {
+            use minimize::{Call, minimize, regular_simplex_centered_at};
+            use crate::types::{BasicExtras, EventSourceSpec};
+
+            struct DummyWrite {}
+
+            impl std::io::Write for &DummyWrite {
+                fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
+
+                fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
+            }
+
+            impl std::io::Write for DummyWrite {
+                fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
+
+                fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
+            }
+
+            let dummy_output = DummyWrite {}; 
+
+            // TODO add another param indicating which params will be minimized.
+            //     Match on it, and select the right params to mass to `minimize`,
+            //     and then print the result out, with an appropriate label.
+            let (func, center) = match () {
+                () => 
+                    (
+                        |[x]: [f32; 1]| {
+                            let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
+
+                            for ess in &mut repeated_event_source_specs {
+                                match ess {
+                                    EventSourceSpec::BuyIfBelowThreshold(params) => {
+                                        params.fullness_threshold = x;
+                                    }
+                                    _ => {}
+                                }
+                            }
+
+                            basic::run(
+                                &Spec {
+                                    mode: BasicSearch(BasicExtras {
+                                        repeated_event_source_specs,
+                                        ..extras.clone()
+                                    }),
+                                    ..spec
+                                },
+                                &dummy_output
+                            ).map(|o| o.performance)
+                            .unwrap_or(basic::Performance::MAX) as _
+                        },
+                        [ 0.5 ]
+                    ),
+                _ => todo!(),
+            };
+
+            let Call { xs: [fullness_threshold], y: performance } = minimize(
+                func,
+                regular_simplex_centered_at(5., center),
+                100,
+            );
+
+            writeln!(&output, "fullness_threshold: {fullness_threshold},")?;
+            writeln!(&output, "performance (closer to 0 is better): {performance},")?;
         }
     }
 

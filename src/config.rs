@@ -66,6 +66,7 @@ impl std::error::Error for AtLeastOneRequiredError {}
 enum RawMode {
     Minimal,
     Basic,
+    BasicSearch,
 }
 
 impl core::fmt::Display for RawMode {
@@ -73,6 +74,7 @@ impl core::fmt::Display for RawMode {
         write!(f, "{}", match self {
             Self::Minimal => "Minimal",
             Self::Basic => "Basic",
+            Self::BasicSearch => "BasicSearch",
         })
     }
 }
@@ -165,7 +167,7 @@ pub fn get_spec() -> Res<Spec> {
 
             Mode::Minimal
         },
-        RawMode::Basic => {
+        RawMode::Basic | RawMode::BasicSearch => {
             let food_types: FoodTypes = unvalidated_spec.food_types.try_into()?;
 
             let mut seen = HashSet::with_capacity(food_types.len());
@@ -317,11 +319,23 @@ pub fn get_spec() -> Res<Spec> {
                 "repeated_event_source_specs" : unvalidated_spec.repeated_event_source_specs
             );
 
-            Mode::Basic(BasicExtras {
-                food_types,
-                initial_event_source_specs,
-                repeated_event_source_specs,
-            })
+            match &unvalidated_spec.mode {
+                RawMode::Basic => {
+                    Mode::Basic(BasicExtras {
+                        food_types,
+                        initial_event_source_specs,
+                        repeated_event_source_specs,
+                    })
+                },
+                RawMode::BasicSearch => {
+                    Mode::BasicSearch(BasicExtras {
+                        food_types,
+                        initial_event_source_specs,
+                        repeated_event_source_specs,
+                    })
+                }
+                _ => unreachable!(),
+            }
         },
     };
 
