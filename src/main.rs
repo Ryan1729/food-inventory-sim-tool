@@ -630,9 +630,13 @@ fn main() -> Res<()> {
                 _ => todo!(),
             };
 
+            let simplex = regular_simplex_centered_at(0.5, center);
+
+            writeln!(&output, "simplex: {simplex:#?},")?;
+
             let Call { xs: [fullness_threshold], y: performance } = minimize(
                 func,
-                regular_simplex_centered_at(5., center),
+                simplex,
                 100,
             );
 
