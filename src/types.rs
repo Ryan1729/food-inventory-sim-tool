@@ -89,8 +89,21 @@ ess_def!{
     RandomEvent(RandomEventParams),
 }
 
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+pub enum SearchTarget {
+    #[default]
+    BuyIfBelowThresholdFullnessThreshold
+}
+
+#[derive(Clone, Debug)]
+pub enum BasicMode {
+    Run,
+    Search(SearchTarget),
+}
+
 #[derive(Clone, Debug)]
 pub struct BasicExtras {
+    pub mode: BasicMode,
     pub food_types: FoodTypes,
     pub initial_event_source_specs: Vec1<EventSourceSpec>,
     pub repeated_event_source_specs: Vec1<EventSourceSpec>,
@@ -101,7 +114,6 @@ pub enum Mode {
     #[default]
     Minimal,
     Basic(BasicExtras),
-    BasicSearch(BasicExtras),
 }
 
 pub type Seed = [u8; 16];

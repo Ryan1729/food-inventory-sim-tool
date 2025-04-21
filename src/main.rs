@@ -1,7 +1,7 @@
 mod xs;
 mod minimize;
 mod types;
-use types::{Mode, Res, Spec};
+use types::{Mode, Res, Spec, BasicMode};
 mod config;
 
 mod minimal {
@@ -262,14 +262,12 @@ mod basic {
 
     pub fn run(spec: &Spec, mut w: impl Write) -> Result<RunOutput, std::io::Error> {
         let crate::types::BasicExtras {
+            mode: _,
             food_types,
             initial_event_source_specs,
             repeated_event_source_specs,
         } = match &spec.mode {
             crate::Mode::Basic(extras) => {
-                extras
-            },
-            crate::Mode::BasicSearch(extras) => {
                 extras
             },
             crate::Mode::Minimal => {
@@ -338,6 +336,7 @@ mod basic {
             }
         }
 
+        // TODO more realistic hunger model with meals
         fn fixed_hunger_amount<F: FnMut(Event)>(
             EventSourceBundle {
                 mut push_event,
@@ -572,76 +571,79 @@ fn main() -> Res<()> {
         Minimal => {
             minimal::run(&spec, &output)?;
         }
-        Basic { .. } => {
-            basic::run(&spec, &output)?;
-        }
-        BasicSearch(extras) => {
-            use minimize::{Call, minimize, regular_simplex_centered_at};
-            use crate::types::{BasicExtras, EventSourceSpec};
-
-            struct DummyWrite {}
-
-            impl std::io::Write for &DummyWrite {
-                fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
-
-                fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
-            }
-
-            impl std::io::Write for DummyWrite {
-                fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
-
-                fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
-            }
-
-            let dummy_output = DummyWrite {}; 
-
-            // TODO add another param indicating which params will be minimized.
-            //     Match on it, and select the right params to mass to `minimize`,
-            //     and then print the result out, with an appropriate label.
-            let (func, center) = match () {
-                () => 
-                    (
-                        |[x]: [f32; 1]| {
-                            let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
-
-                            for ess in &mut repeated_event_source_specs {
-                                match ess {
-                                    EventSourceSpec::BuyIfBelowThreshold(params) => {
-                                        params.fullness_threshold = x;
+        Basic(ref extras) => {
+            match extras.mode {
+                BasicMode::Run => {
+                    basic::run(&spec, &output)?;
+                },
+                BasicMode::Search(ref target) => {
+                    use minimize::{Call, minimize, regular_simplex_centered_at};
+                    use crate::types::{BasicExtras, EventSourceSpec, BasicMode, SearchTarget};
+        
+                    struct DummyWrite {}
+        
+                    impl std::io::Write for &DummyWrite {
+                        fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
+        
+                        fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
+                    }
+        
+                    impl std::io::Write for DummyWrite {
+                        fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
+        
+                        fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
+                    }
+        
+                    let dummy_output = DummyWrite {}; 
+        
+                    let (func, center) = match target {
+                        // TODO add more variants when we have more desired targets
+                        SearchTarget::BuyIfBelowThresholdFullnessThreshold => 
+                            (
+                                |[x]: [f32; 1]| {
+                                    let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
+        
+                                    for ess in &mut repeated_event_source_specs {
+                                        match ess {
+                                            EventSourceSpec::BuyIfBelowThreshold(params) => {
+                                                params.fullness_threshold = x;
+                                            }
+                                            _ => {}
+                                        }
                                     }
-                                    _ => {}
-                                }
-                            }
-
-                            basic::run(
-                                &Spec {
-                                    mode: BasicSearch(BasicExtras {
-                                        repeated_event_source_specs,
-                                        ..extras.clone()
-                                    }),
-                                    ..spec
+        
+                                    basic::run(
+                                        &Spec {
+                                            mode: Basic(BasicExtras {
+                                                mode: BasicMode::Run,
+                                                repeated_event_source_specs,
+                                                ..extras.clone()
+                                            }),
+                                            ..spec
+                                        },
+                                        &dummy_output
+                                    ).map(|o| o.performance)
+                                    .unwrap_or(basic::Performance::MAX) as _
                                 },
-                                &dummy_output
-                            ).map(|o| o.performance)
-                            .unwrap_or(basic::Performance::MAX) as _
-                        },
-                        [ 0.5 ]
-                    ),
-                _ => todo!(),
-            };
-
-            let simplex = regular_simplex_centered_at(0.5, center);
-
-            writeln!(&output, "simplex: {simplex:#?},")?;
-
-            let Call { xs: [fullness_threshold], y: performance } = minimize(
-                func,
-                simplex,
-                100,
-            );
-
-            writeln!(&output, "fullness_threshold: {fullness_threshold},")?;
-            writeln!(&output, "performance (closer to 0 is better): {performance},")?;
+                                [ 0.5 ]
+                            ),
+                    };
+        
+                    let simplex = regular_simplex_centered_at(0.5, center);
+        
+                    writeln!(&output, "simplex: {simplex:#?},")?;
+        
+                    // TODO visualize the calls that were made
+                    let Call { xs: [fullness_threshold], y: performance } = minimize(
+                        func,
+                        simplex,
+                        100,
+                    );
+        
+                    writeln!(&output, "fullness_threshold: {fullness_threshold},")?;
+                    writeln!(&output, "performance (closer to 0 is better): {performance},")?;
+                },
+            }
         }
     }
 

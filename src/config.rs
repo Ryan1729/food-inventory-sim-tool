@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicExtras, FoodTypes, Mode, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, Spec};
+use crate::types::{self, food, BasicMode, BasicExtras, FoodTypes, Mode, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, Spec, SearchTarget};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -66,7 +66,6 @@ impl std::error::Error for AtLeastOneRequiredError {}
 enum RawMode {
     Minimal,
     Basic,
-    BasicSearch,
 }
 
 impl core::fmt::Display for RawMode {
@@ -74,7 +73,7 @@ impl core::fmt::Display for RawMode {
         write!(f, "{}", match self {
             Self::Minimal => "Minimal",
             Self::Basic => "Basic",
-            Self::BasicSearch => "BasicSearch",
+
         })
     }
 }
@@ -99,6 +98,13 @@ struct RawEventSourceSpec {
     pub fullness_threshold: types::FullnessThreshold,
 }
 
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+pub enum RawBasicMode {
+    #[default]
+    Run,
+    Search,
+}
+
 #[derive(serde::Deserialize)]
 struct RawSpec {
     // All modes
@@ -111,6 +117,10 @@ struct RawSpec {
     pub initial_event_source_specs: Vec<RawEventSourceSpec>,
     #[serde(default)]
     pub repeated_event_source_specs: Vec<RawEventSourceSpec>,
+    #[serde(default)]
+    pub basic_mode: RawBasicMode,
+    #[serde(default)]
+    pub basic_search_target: SearchTarget,
     // Output Flags section
     // Designed such that all false is a good default.
     #[serde(default)]
@@ -167,7 +177,7 @@ pub fn get_spec() -> Res<Spec> {
 
             Mode::Minimal
         },
-        RawMode::Basic | RawMode::BasicSearch => {
+        RawMode::Basic => {
             let food_types: FoodTypes = unvalidated_spec.food_types.try_into()?;
 
             let mut seen = HashSet::with_capacity(food_types.len());
@@ -319,22 +329,23 @@ pub fn get_spec() -> Res<Spec> {
                 "repeated_event_source_specs" : unvalidated_spec.repeated_event_source_specs
             );
 
-            match &unvalidated_spec.mode {
-                RawMode::Basic => {
+            match &unvalidated_spec.basic_mode {
+                RawBasicMode::Run => {
                     Mode::Basic(BasicExtras {
+                        mode: BasicMode::Run,
                         food_types,
                         initial_event_source_specs,
                         repeated_event_source_specs,
                     })
                 },
-                RawMode::BasicSearch => {
-                    Mode::BasicSearch(BasicExtras {
+                RawBasicMode::Search => {
+                    Mode::Basic(BasicExtras {
+                        mode: BasicMode::Search(unvalidated_spec.basic_search_target),
                         food_types,
                         initial_event_source_specs,
                         repeated_event_source_specs,
                     })
                 }
-                _ => unreachable!(),
             }
         },
     };
