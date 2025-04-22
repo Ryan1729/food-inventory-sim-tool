@@ -1,0 +1,102 @@
+Spec(
+    mode: "Basic",
+    basic_mode: "PrintCalls",
+    seed: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],
+    food_types: [
+        Type (
+            key: "Jam",
+            options: [
+                Option (
+                    grams: 500,
+                ),
+                Option (
+                    grams: 1000,
+                ),
+            ],
+        ),
+        Type (
+            key: "Peanut Butter",
+            options: [
+                Option (
+                    grams: 1000,
+                ),
+                Option (
+                    grams: 2000,
+                ),
+            ],
+        ),
+        Type (
+            key: "Bread",
+            options: [
+                Option (
+                    grams: 600,
+                ),
+            ],
+        ),
+        Type (
+            key: "Frozen Asparagus",
+            options: [
+                Option (
+                    grams: 300,
+                ),
+            ],
+        ),
+        Type (
+            key: "Frozen Brussels Sprouts",
+            options: [
+                Option (
+                    grams: 500,
+                ),
+                Option (
+                    grams: 750,
+                ),
+            ],
+        ),
+        Type (
+            key: "Instant Ramen",
+            options: [
+                Option (
+                    grams: 2040, // 24 * 85
+                ),
+            ],
+        ),
+        Type (
+            key: "Multigrain Cheerios",
+            options: [
+                Option (
+                    grams: 2020, // 1010 * 2
+                ),
+            ],
+        ),
+        Type (
+            key: "Milk",
+            options: [
+                Option (
+                    grams: 2000,
+                ),
+            ],
+        ),
+    ],
+    initial_event_source_specs: [
+        (
+            kind: "BuyRandomVariety",
+            count: 3,
+            offset: 1,
+        ),
+    ],
+    repeated_event_source_specs: [
+        (
+            kind: "FixedHungerAmount",
+            grams_per_day: 2000,
+        ),
+        (
+            kind: "BuyIfBelowThreshold",
+            max_count: 255,
+            fullness_threshold: 0,
+        ),
+        (
+            kind: "RandomEvent",
+            roll_one_past_max: 16,
+        ),
+    ],
+)

@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicMode, BasicExtras, FoodTypes, Mode, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, Spec, SearchTarget};
+use crate::types::{self, food, BasicMode, BasicExtras, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, Spec, Target};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -103,6 +103,7 @@ pub enum RawBasicMode {
     #[default]
     Run,
     Search,
+    PrintCalls,
 }
 
 #[derive(serde::Deserialize)]
@@ -120,7 +121,7 @@ struct RawSpec {
     #[serde(default)]
     pub basic_mode: RawBasicMode,
     #[serde(default)]
-    pub basic_search_target: SearchTarget,
+    pub basic_target: Target,
     // Output Flags section
     // Designed such that all false is a good default.
     #[serde(default)]
@@ -340,12 +341,22 @@ pub fn get_spec() -> Res<Spec> {
                 },
                 RawBasicMode::Search => {
                     Mode::Basic(BasicExtras {
-                        mode: BasicMode::Search(unvalidated_spec.basic_search_target),
+                        mode: BasicMode::Search(unvalidated_spec.basic_target),
                         food_types,
                         initial_event_source_specs,
                         repeated_event_source_specs,
                     })
-                }
+                },
+                RawBasicMode::PrintCalls => {
+                    Mode::Basic(BasicExtras {
+                        mode: BasicMode::PrintCalls(PrintCallsSpec {
+                            target: unvalidated_spec.basic_target
+                        }),
+                        food_types,
+                        initial_event_source_specs,
+                        repeated_event_source_specs,
+                    })
+                },
             }
         },
     };

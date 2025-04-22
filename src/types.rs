@@ -89,16 +89,26 @@ ess_def!{
     RandomEvent(RandomEventParams),
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize)]
-pub enum SearchTarget {
+#[derive(Clone, Copy, Debug, Default, serde::Deserialize)]
+pub enum Target {
     #[default]
     BuyIfBelowThresholdFullnessThreshold
 }
 
 #[derive(Clone, Debug)]
+pub struct PrintCallsSpec {
+    pub target: Target,
+    // TODO: to control
+    //start: f32,
+    //step: f32,
+    //end: f32,
+}
+
+#[derive(Clone, Debug)]
 pub enum BasicMode {
     Run,
-    Search(SearchTarget),
+    Search(Target),
+    PrintCalls(PrintCallsSpec),
 }
 
 #[derive(Clone, Debug)]

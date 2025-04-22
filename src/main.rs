@@ -1,7 +1,7 @@
 mod xs;
 mod minimize;
 mod types;
-use types::{Mode, Res, Spec, BasicMode};
+use types::{Mode, Res, Spec, PrintCallsSpec};
 mod config;
 
 mod minimal {
@@ -559,8 +559,24 @@ mod basic {
     }
 }
 
+struct DummyWrite {}
+
+impl std::io::Write for &DummyWrite {
+    fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
+
+    fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
+}
+
+impl std::io::Write for DummyWrite {
+    fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
+
+    fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
+}
+
 fn main() -> Res<()> {
     use Mode::*;
+    use crate::types::{BasicExtras, EventSourceSpec, BasicMode, Target};
+
     use std::io::Write;
 
     let spec: Spec = config::get_spec()?;
@@ -576,29 +592,61 @@ fn main() -> Res<()> {
                 BasicMode::Run => {
                     basic::run(&spec, &output)?;
                 },
+                BasicMode::PrintCalls(PrintCallsSpec{ target }) => {
+                    let dummy_output = DummyWrite {};
+
+                    let func = match target {
+                        // TODO add more variants when we have more desired targets
+                        Target::BuyIfBelowThresholdFullnessThreshold => 
+                            |[x]: [f32; 1]| {
+                                let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
+    
+                                for ess in &mut repeated_event_source_specs {
+                                    match ess {
+                                        EventSourceSpec::BuyIfBelowThreshold(params) => {
+                                            params.fullness_threshold = x;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+    
+                                basic::run(
+                                    &Spec {
+                                        mode: Basic(BasicExtras {
+                                            mode: BasicMode::Run,
+                                            repeated_event_source_specs,
+                                            ..extras.clone()
+                                        }),
+                                        ..spec
+                                    },
+                                    &dummy_output
+                                ).map(|o| o.performance)
+                                .unwrap_or(basic::Performance::MAX) as _
+                            },
+                    };
+
+                    let mut x = 0.0;
+
+                    let step = 1./32.;
+
+                    writeln!(&output, "[")?;
+                    while x <= 1. {
+                        let y: f32 = func([x]);
+
+                        writeln!(&output, "    ({x}, {y}),")?;
+
+                        x += step;
+                    }
+                    writeln!(&output, "]")?;
+                },
                 BasicMode::Search(ref target) => {
                     use minimize::{Call, minimize, regular_simplex_centered_at};
-                    use crate::types::{BasicExtras, EventSourceSpec, BasicMode, SearchTarget};
-        
-                    struct DummyWrite {}
-        
-                    impl std::io::Write for &DummyWrite {
-                        fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
-        
-                        fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
-                    }
-        
-                    impl std::io::Write for DummyWrite {
-                        fn write(&mut self, data: &[u8]) -> Result<usize, std::io::Error> { Ok(data.len()) }
-        
-                        fn flush(&mut self) -> Result<(), std::io::Error> { Ok(()) }
-                    }
-        
-                    let dummy_output = DummyWrite {}; 
+
+                    let dummy_output = DummyWrite {};
         
                     let (func, center) = match target {
                         // TODO add more variants when we have more desired targets
-                        SearchTarget::BuyIfBelowThresholdFullnessThreshold => 
+                        Target::BuyIfBelowThresholdFullnessThreshold => 
                             (
                                 |[x]: [f32; 1]| {
                                     let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
