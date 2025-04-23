@@ -7,6 +7,9 @@ pub type FoodTypes = Vec1<food::Type>;
 /// 64k items in one trip ought to be enough for anybody!
 pub type ShoppingCount = u16;
 
+/// 64k servings per day ought to be enough for anybody!
+pub type ServingsCount = u16;
+
 pub type IndexOffset = usize;
 
 pub type FullnessThreshold = f32;
@@ -33,6 +36,11 @@ pub struct BuyRandomVarietyParams {
 #[derive(Clone, Debug)]
 pub struct FixedHungerAmountParams {
     pub grams_per_day: food::Grams,
+}
+
+#[derive(Clone, Debug)]
+pub struct FixedServingsAmountParams {
+    pub servings_per_day: ServingsCount,
 }
 
 /// One past max value of a die to roll from 0 to. So a value of 6 indicates a roll between 6 values from
@@ -85,6 +93,7 @@ ess_def!{
     BuyIfHalfEmpty(BuyIfHalfEmptyParams),
     BuyRandomVariety(BuyRandomVarietyParams),
     FixedHungerAmount(FixedHungerAmountParams),
+    FixedServingsAmount(FixedServingsAmountParams),
     ShopSomeDays(ShopSomeDaysParams),
     RandomEvent(RandomEventParams),
 }

@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicMode, BasicExtras, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, Spec, Target};
+use crate::types::{self, food, BasicMode, BasicExtras, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, ServingsCount, Spec, Target};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -84,6 +84,8 @@ struct RawEventSourceSpec {
     // All of the fields from all of the params
     #[serde(default)]
     pub grams_per_day: food::Grams,
+    #[serde(default)]
+    pub servings_per_day: ServingsCount,
     #[serde(default)]
     pub buy_count: u8,
     #[serde(default)]
@@ -283,6 +285,17 @@ pub fn get_spec() -> Res<Spec> {
                                 specs_vec.push(
                                     ESS::FixedHungerAmount(FixedHungerAmountParams {
                                         grams_per_day: e_s_spec.grams_per_day
+                                    })
+                                );
+                            },
+                            FixedServingsAmount => {
+                                excess_data_check!(
+                                    specs[i] $error_key : buy_count roll_one_past_max max_count
+                                );
+
+                                specs_vec.push(
+                                    ESS::FixedServingsAmount(FixedServingsAmountParams {
+                                        servings_per_day: e_s_spec.servings_per_day
                                     })
                                 );
                             },

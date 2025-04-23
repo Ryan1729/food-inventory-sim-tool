@@ -337,6 +337,42 @@ mod basic {
         }
 
         // TODO more realistic hunger model with meals
+
+        // TODO more realistic hunger model with servings, and a global max servings per day.
+        //    a normal distribution from the min to the max seems better than uniform here.
+        //        That is because more than one serving is quite common, and normal distributions 
+        //        seem more likely to reflect real world phenomena
+        fn fixed_servings_amount<F: FnMut(Event)>(
+            EventSourceBundle {
+                mut push_event,
+                rng,
+                food_types,
+                ..
+            }: EventSourceBundle<F>,
+            FixedServingsAmountParams { servings_per_day }: &FixedServingsAmountParams,
+        ) {
+            let mut servings_remaining = *servings_per_day;
+            while servings_remaining > 0 {
+                let index = xs::range(rng, 0..food_types.len() as u32) as usize;
+
+                let type_ = &food_types[index];
+
+                // TODO Eat a randomized amount of servings each time we pick a food type.
+
+                // let servings_count = xs::range(rng, 1..(servings_remaining as u32 + 1));
+
+                // TODO define serving amount on each food, so we can use it here.
+                let amount: food::Grams = 100; //type_.serving;                
+
+                push_event(Event::Ate(
+                    type_.key.clone(),
+                    amount,
+                ));
+
+                servings_remaining = servings_remaining.saturating_sub(amount as _);
+            }
+        }
+
         fn fixed_hunger_amount<F: FnMut(Event)>(
             EventSourceBundle {
                 mut push_event,
@@ -352,7 +388,6 @@ mod basic {
 
                 let type_ = &food_types[index];
 
-                // TODO Define a serving on each food type, and eat say 1.5 to 2.5 of them each time
                 let amount = xs::range(rng, 1..(grams_remaining as u32 + 1)) as Grams;
 
                 push_event(Event::Ate(
@@ -428,6 +463,7 @@ mod basic {
                         EventSourceSpec::BuyIfHalfEmpty(p) => buy_if_half_empty(b!(), &p),
                         EventSourceSpec::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
                         EventSourceSpec::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),
+                        EventSourceSpec::FixedServingsAmount(p) => fixed_servings_amount(b!(), &p),
                         EventSourceSpec::ShopSomeDays(p) => shop_some_days(b!(), &p),
                         EventSourceSpec::RandomEvent(p) => random_event(b!(), &p),
                     }
@@ -467,6 +503,12 @@ mod basic {
                         writeln!(w, "============= End of Day ================")?;
                         writeln!(w, "Ate: {daily_ate_total}")?;
                         writeln!(w, "Bought: {daily_bought_total}")?;
+                        writeln!(w, "Stock:")?;
+
+                        for item in &study.shelf {
+                            writeln!(w, "    {}: {}g", item.key, item.grams)?;
+                        }
+
                         writeln!(w, "=========================================")?;
                         daily_ate_total = 0;
                         daily_bought_total = 0;
@@ -627,7 +669,7 @@ fn main() -> Res<()> {
 
                     let mut x = 0.0;
 
-                    let step = 1./32.;
+                    let step = 1./64.;
 
                     writeln!(&output, "[")?;
                     while x <= 1. {
