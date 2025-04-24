@@ -340,7 +340,7 @@ mod basic {
 
         // TODO more realistic hunger model with servings, and a global max servings per day.
         //    a normal distribution from the min to the max seems better than uniform here.
-        //        That is because more than one serving is quite common, and normal distributions 
+        //        That is because more than one serving is quite common, and normal distributions
         //        seem more likely to reflect real world phenomena
         fn fixed_servings_amount<F: FnMut(Event)>(
             EventSourceBundle {
@@ -351,25 +351,30 @@ mod basic {
             }: EventSourceBundle<F>,
             FixedServingsAmountParams { servings_per_day }: &FixedServingsAmountParams,
         ) {
-            let mut servings_remaining = *servings_per_day;
-            while servings_remaining > 0 {
+            let mut g_state = xs::GaussianState::default();
+
+            let mut servings_remaining = (*servings_per_day) as f32;
+            while servings_remaining > 0. {
                 let index = xs::range(rng, 0..food_types.len() as u32) as usize;
 
                 let type_ = &food_types[index];
 
-                // TODO Eat a randomized amount of servings each time we pick a food type.
-
-                // let servings_count = xs::range(rng, 1..(servings_remaining as u32 + 1));
+                // 1 to 4 servings
+                let mut servings_count = 1. + xs::gaussian_zero_to_one(rng, &mut g_state) * 3.;
+                servings_count = servings_count.abs();
 
                 // TODO define serving amount on each food, so we can use it here.
-                let amount: food::Grams = 100; //type_.serving;                
+                let serving_grams = 100; //type_.serving;
+
+                let amount =
+                    (servings_count * serving_grams as f32) as food::Grams;
 
                 push_event(Event::Ate(
                     type_.key.clone(),
                     amount,
                 ));
 
-                servings_remaining = servings_remaining.saturating_sub(amount as _);
+                servings_remaining -= servings_count;
             }
         }
 
@@ -526,7 +531,7 @@ mod basic {
                         &food_types,
                         event
                     );
-        
+
                     if spec.show_step_by_step {
                         use TrackingStep::*;
                         for step in &tracking_steps {
@@ -540,7 +545,7 @@ mod basic {
                                     if *out_count > 0 {
                                         writeln!(w, "    Ran out by {out_count}g")?;
                                     }
-                                    
+
                                     daily_ate_total += eaten;
                                 },
                                 Bought(grams, key) => {
@@ -639,10 +644,10 @@ fn main() -> Res<()> {
 
                     let func = match target {
                         // TODO add more variants when we have more desired targets
-                        Target::BuyIfBelowThresholdFullnessThreshold => 
+                        Target::BuyIfBelowThresholdFullnessThreshold =>
                             |[x]: [f32; 1]| {
                                 let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
-    
+
                                 for ess in &mut repeated_event_source_specs {
                                     match ess {
                                         EventSourceSpec::BuyIfBelowThreshold(params) => {
@@ -651,7 +656,7 @@ fn main() -> Res<()> {
                                         _ => {}
                                     }
                                 }
-    
+
                                 basic::run(
                                     &Spec {
                                         mode: Basic(BasicExtras {
@@ -685,14 +690,14 @@ fn main() -> Res<()> {
                     use minimize::{Call, minimize, regular_simplex_centered_at};
 
                     let dummy_output = DummyWrite {};
-        
+
                     let (func, center) = match target {
                         // TODO add more variants when we have more desired targets
-                        Target::BuyIfBelowThresholdFullnessThreshold => 
+                        Target::BuyIfBelowThresholdFullnessThreshold =>
                             (
                                 |[x]: [f32; 1]| {
                                     let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
-        
+
                                     for ess in &mut repeated_event_source_specs {
                                         match ess {
                                             EventSourceSpec::BuyIfBelowThreshold(params) => {
@@ -701,7 +706,7 @@ fn main() -> Res<()> {
                                             _ => {}
                                         }
                                     }
-        
+
                                     basic::run(
                                         &Spec {
                                             mode: Basic(BasicExtras {
@@ -718,18 +723,18 @@ fn main() -> Res<()> {
                                 [ 0.5 ]
                             ),
                     };
-        
+
                     let simplex = regular_simplex_centered_at(0.5, center);
-        
+
                     writeln!(&output, "simplex: {simplex:#?},")?;
-        
+
                     // TODO visualize the calls that were made
                     let Call { xs: [fullness_threshold], y: performance } = minimize(
                         func,
                         simplex,
                         100,
                     );
-        
+
                     writeln!(&output, "fullness_threshold: {fullness_threshold},")?;
                     writeln!(&output, "performance (closer to 0 is better): {performance},")?;
                 },

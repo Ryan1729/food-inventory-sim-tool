@@ -48,6 +48,41 @@ pub fn shuffle<A>(xs: &mut Xs, slice: &mut [A]) {
     }
 }
 
+#[derive(Default)]
+pub struct GaussianState {
+    cached: Option<f32>,
+}
+
+pub fn gaussian_zero_to_one(xs: &mut Xs, state: &mut GaussianState) -> f32 {
+    // loosely based on the numpy implmentation
+    match state.cached.take() {
+        Some(cached) => {
+            cached
+        }
+        None => {
+            let mut f;
+            let mut x1;
+            let mut x2;
+            let mut r2;
+    
+            while {
+                x1 = minus_one_to_one(xs);
+                x2 = minus_one_to_one(xs);
+                r2 = x1 * x1 + x2 * x2;
+
+                r2 >= 1.0 || r2 == 0.0
+            } {}
+    
+            /* Box-Muller transform */
+            f = (-2.0*(r2.ln())/r2).sqrt();
+            /* Keep for next call */
+            state.cached = Some(f * x1);
+
+            f * x2
+        }
+    }
+}
+
 pub fn new_seed(xs: &mut Xs) -> Seed {
     let s0 = xorshift(xs).to_le_bytes();
     let s1 = xorshift(xs).to_le_bytes();
