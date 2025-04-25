@@ -101,7 +101,7 @@ mod basic {
     #[derive(Debug)]
     enum TrackingStep {
         Starved(Grams),
-        Ate { eaten: Grams, key: food::Key, out_count: Grams },
+        Ate { eaten: Grams, key: food::Key, out_count: Grams, servings_count: f32 },
         Bought(Grams, food::Key),
     }
 
@@ -123,20 +123,35 @@ mod basic {
             }
         }
 
+        struct ShelfIndex(usize);
+
+        fn calc_servings_count(
+            food_types: &FoodTypes,
+            key: &food::Key,
+            grams: Grams,
+        ) -> f32 {
+            food_types.iter().find(|type_| &type_.key == key)
+                .map(|type_| {
+                    grams as f32 / type_.serving as f32
+                })
+                .unwrap_or(-f32::INFINITY)
+        }
+
         match event {
             Event::Ate(key, grams, .. ) => {
                 fn eat_at(
                     study: &mut Shelf,
                     tracking_steps: &mut Vec<TrackingStep>,
-                    index: usize,
-                    grams: Grams
+                    index: ShelfIndex,
+                    grams: Grams,
+                    food_types: &FoodTypes,
                 ) {
-                    if index >= study.shelf.len() {
+                    if index.0 >= study.shelf.len() {
                         study.perf.starved_count += 1;
                         tracking_steps.push(TrackingStep::Starved(grams));
                         return
                     }
-                    let food = &mut study.shelf[index];
+                    let food = &mut study.shelf[index.0];
                     if let Some(subtracted) = food.grams.checked_sub(grams) {
                         // Base case
                         food.grams = subtracted;
@@ -144,6 +159,7 @@ mod basic {
                             eaten: grams,
                             key: food.key.clone(),
                             out_count: 0,
+                            servings_count: calc_servings_count(food_types, &food.key, grams),
                         });
                     } else {
                         let remaining_grams = grams - food.grams;
@@ -151,28 +167,29 @@ mod basic {
                             eaten: food.grams,
                             key: food.key.clone(),
                             out_count: remaining_grams,
+                            servings_count: calc_servings_count(food_types, &food.key, grams),
                         });
                         study.perf.out_count += remaining_grams;
                         food.grams = 0;
 
-                        study.shelf.swap_remove(index);
+                        study.shelf.swap_remove(index.0);
 
                         // TODO? Allow configuring this? Make random an option?
-                        let arbitrary_index = 0;
+                        let arbitrary_index = ShelfIndex(0);
 
-                        eat_at(study, tracking_steps, arbitrary_index, remaining_grams);
+                        eat_at(study, tracking_steps, arbitrary_index, remaining_grams, food_types);
                     }
                 }
 
                 if let Some(index) = study.shelf.iter().position(|f| f.key == key) {
-                    eat_at(study, tracking_steps, index, grams);
+                    eat_at(study, tracking_steps, ShelfIndex(index), grams, food_types);
                 } else {
                     study.perf.out_count += grams;
 
                     // TODO? Allow configuring this? Make random an option?
-                    let arbitrary_index = 0;
+                    let arbitrary_index = ShelfIndex(0);
 
-                    eat_at(study, tracking_steps, arbitrary_index, grams);
+                    eat_at(study, tracking_steps, arbitrary_index, grams, food_types);
                 }
             },
             Event::Bought(food) => {
@@ -294,9 +311,6 @@ mod basic {
             food_types: &'food_types FoodTypes,
         }
 
-        // TODO Can we find the best value for the fullness_threshold param, under a given set of other params?
-        //    How to expose searching for that as a setting?
-        //        BasicSearch as a mode, and todo!()s as needed
         fn buy_if_below_threshold<F: FnMut(Event)>(
             EventSourceBundle {
                 mut push_event,
@@ -338,10 +352,6 @@ mod basic {
 
         // TODO more realistic hunger model with meals
 
-        // TODO more realistic hunger model with servings, and a global max servings per day.
-        //    a normal distribution from the min to the max seems better than uniform here.
-        //        That is because more than one serving is quite common, and normal distributions
-        //        seem more likely to reflect real world phenomena
         fn fixed_servings_amount<F: FnMut(Event)>(
             EventSourceBundle {
                 mut push_event,
@@ -359,12 +369,10 @@ mod basic {
 
                 let type_ = &food_types[index];
 
-                // 1 to 4 servings
-                let mut servings_count = 1. + xs::gaussian_zero_to_one(rng, &mut g_state) * 3.;
-                servings_count = servings_count.abs();
+                // At least one serving, and as much as four.
+                let servings_count = 1. + xs::gaussian_zero_to_one(rng, &mut g_state) * 3.;
 
-                // TODO define serving amount on each food, so we can use it here.
-                let serving_grams = 100; //type_.serving;
+                let serving_grams = type_.serving;
 
                 let amount =
                     (servings_count * serving_grams as f32) as food::Grams;
@@ -539,8 +547,9 @@ mod basic {
                                 Starved(grams) => {
                                     writeln!(w, "Starved by {grams}g")?;
                                 }
-                                Ate { eaten, key, out_count } => {
-                                    writeln!(w, "Ate {eaten}g of {key}")?;
+                                Ate { eaten, key, out_count, servings_count } => {
+                                    // TODO? label when it's a substitute thing, so lots of servings are expected?
+                                    writeln!(w, "Ate {eaten}g of {key} ({servings_count} servings)")?;
 
                                     if *out_count > 0 {
                                         writeln!(w, "    Ran out by {out_count}g")?;
@@ -728,7 +737,6 @@ fn main() -> Res<()> {
 
                     writeln!(&output, "simplex: {simplex:#?},")?;
 
-                    // TODO visualize the calls that were made
                     let Call { xs: [fullness_threshold], y: performance } = minimize(
                         func,
                         simplex,

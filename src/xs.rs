@@ -53,7 +53,8 @@ pub struct GaussianState {
     cached: Option<f32>,
 }
 
-pub fn gaussian_zero_to_one(xs: &mut Xs, state: &mut GaussianState) -> f32 {
+/// Outputs numbers in a normal distribution centered around 0. No guarantees are made about the range of these values.
+pub fn gaussian(xs: &mut Xs, state: &mut GaussianState) -> f32 {
     // loosely based on the numpy implmentation
     match state.cached.take() {
         Some(cached) => {
@@ -81,6 +82,23 @@ pub fn gaussian_zero_to_one(xs: &mut Xs, state: &mut GaussianState) -> f32 {
             f * x2
         }
     }
+}
+
+pub fn gaussian_zero_to_one(xs: &mut Xs, state: &mut GaussianState) -> f32 {
+    let mut output = gaussian(xs, state);
+
+    // Centered around 0.0 to around 0.5
+    output += 0.5;
+
+    while output < 0.0 {
+        output += 1.0;
+    }
+
+    while output > 1.0 {
+        output -= 1.0;
+    }
+
+    output
 }
 
 pub fn new_seed(xs: &mut Xs) -> Seed {

@@ -14,6 +14,7 @@ Spec(
                     grams: 1000,
                 ),
             ],
+            serving: 15,
         ),
         Type (
             key: "Peanut Butter",
@@ -25,6 +26,7 @@ Spec(
                     grams: 2000,
                 ),
             ],
+            serving: 15,
         ),
         Type (
             key: "Bread",
@@ -33,6 +35,7 @@ Spec(
                     grams: 600,
                 ),
             ],
+            serving: 75,
         ),
     ],
     initial_event_source_specs: [

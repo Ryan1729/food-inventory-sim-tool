@@ -150,10 +150,16 @@ pub mod food {
         pub grams: Grams,
     }
 
+    const fn default_serving() -> Grams {
+        100
+    }
+
     #[derive(Clone, Debug, serde::Deserialize)]
     pub struct Type {
         pub key: Key,
         pub options: Vec1<Option>,
+        #[serde(default = "default_serving")]
+        pub serving: Grams,
     }
 }
 

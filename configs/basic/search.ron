@@ -13,6 +13,7 @@ Spec(
                     grams: 1000,
                 ),
             ],
+            serving: 15,
         ),
         Type (
             key: "Peanut Butter",
@@ -24,6 +25,7 @@ Spec(
                     grams: 2000,
                 ),
             ],
+            serving: 15,
         ),
         Type (
             key: "Bread",
@@ -32,49 +34,7 @@ Spec(
                     grams: 600,
                 ),
             ],
-        ),
-        Type (
-            key: "Frozen Asparagus",
-            options: [
-                Option (
-                    grams: 300,
-                ),
-            ],
-        ),
-        Type (
-            key: "Frozen Brussels Sprouts",
-            options: [
-                Option (
-                    grams: 500,
-                ),
-                Option (
-                    grams: 750,
-                ),
-            ],
-        ),
-        Type (
-            key: "Instant Ramen",
-            options: [
-                Option (
-                    grams: 2040, // 24 * 85
-                ),
-            ],
-        ),
-        Type (
-            key: "Multigrain Cheerios",
-            options: [
-                Option (
-                    grams: 2020, // 1010 * 2
-                ),
-            ],
-        ),
-        Type (
-            key: "Milk",
-            options: [
-                Option (
-                    grams: 2000,
-                ),
-            ],
+            serving: 75,
         ),
     ],
     initial_event_source_specs: [
