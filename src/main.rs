@@ -69,8 +69,13 @@ mod basic {
             }
         }
 
+        #[allow(unused)]
         pub fn is_at_least_this_full(&self, fullness_threshold: FullnessThreshold) -> bool {
             self.grams as f32 >= (self.option.grams as f32 * fullness_threshold)
+        }
+
+        pub fn current_fullness(&self) -> f32 {
+            self.grams as f32 / self.option.grams as f32
         }
     }
 
@@ -206,18 +211,18 @@ mod basic {
                 let mut count = 0;
 
                 for type_ in food_types.iter() {
-                    let mut have_full_enough = false;
+                    let mut total_fullness = 0.;
 
-                    // TODO? avoid O(n^2) here?
+                    // TODO? avoid O(n^2) here? Like maybe calcualting all the totals AOT say?
                     for i in 0..study.shelf.len() {
                         let food = &study.shelf[(i + offset) % study.shelf.len()];
-                        if type_.key == food.key && food.is_at_least_this_full(fullness_threshold) {
-                            have_full_enough = true;
+                        if type_.key == food.key {
+                            total_fullness += food.current_fullness();
                             break
                         }
                     }
 
-                    if !have_full_enough && count < max_count {
+                    if total_fullness < fullness_threshold && count < max_count {
                         buy!(Food::from_rng_of_type(&type_, rng));
                         count += 1;
                     }
