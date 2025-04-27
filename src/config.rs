@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicMode, BasicExtras, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, ServingsCount, Spec, Target};
+use crate::types::{self, food, BasicMode, BasicExtras, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, SearchSpec, ServingsCount, Spec, Target};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -108,6 +108,14 @@ pub enum RawBasicMode {
     PrintCalls,
 }
 
+fn default_length() -> f32 {
+    1.
+}
+
+fn default_step() -> f32 {
+    1. / 64.
+}
+
 #[derive(serde::Deserialize)]
 struct RawSpec {
     // All modes
@@ -124,6 +132,12 @@ struct RawSpec {
     pub basic_mode: RawBasicMode,
     #[serde(default)]
     pub basic_target: Target,
+    #[serde(default = "default_length")]
+    pub basic_length: f32,
+    #[serde(default)]
+    pub basic_offset: f32,
+    #[serde(default = "default_step")]
+    pub basic_step: f32,
     // Output Flags section
     // Designed such that all false is a good default.
     #[serde(default)]
@@ -354,7 +368,11 @@ pub fn get_spec() -> Res<Spec> {
                 },
                 RawBasicMode::Search => {
                     Mode::Basic(BasicExtras {
-                        mode: BasicMode::Search(unvalidated_spec.basic_target),
+                        mode: BasicMode::Search(SearchSpec {
+                            target: unvalidated_spec.basic_target,
+                            length: unvalidated_spec.basic_length,
+                            offset: unvalidated_spec.basic_offset,
+                        }),
                         food_types,
                         initial_event_source_specs,
                         repeated_event_source_specs,
@@ -363,7 +381,10 @@ pub fn get_spec() -> Res<Spec> {
                 RawBasicMode::PrintCalls => {
                     Mode::Basic(BasicExtras {
                         mode: BasicMode::PrintCalls(PrintCallsSpec {
-                            target: unvalidated_spec.basic_target
+                            target: unvalidated_spec.basic_target,
+                            length: unvalidated_spec.basic_length,
+                            offset: unvalidated_spec.basic_offset,
+                            step: unvalidated_spec.basic_step,
                         }),
                         food_types,
                         initial_event_source_specs,

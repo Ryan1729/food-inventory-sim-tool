@@ -105,18 +105,24 @@ pub enum Target {
 }
 
 #[derive(Clone, Debug)]
+pub struct SearchSpec {
+    pub target: Target,
+    pub length: f32,
+    pub offset: f32,
+}
+
+#[derive(Clone, Debug)]
 pub struct PrintCallsSpec {
     pub target: Target,
-    // TODO: to control
-    //start: f32,
-    //step: f32,
-    //end: f32,
+    pub length: f32,
+    pub offset: f32,
+    pub step: f32,
 }
 
 #[derive(Clone, Debug)]
 pub enum BasicMode {
     Run,
-    Search(Target),
+    Search(SearchSpec),
     PrintCalls(PrintCallsSpec),
 }
 

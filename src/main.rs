@@ -1,7 +1,7 @@
 mod xs;
 mod minimize;
 mod types;
-use types::{Mode, Res, Spec, PrintCallsSpec};
+use types::{Mode, Res, Spec, SearchSpec, PrintCallsSpec};
 mod config;
 
 mod minimal {
@@ -653,7 +653,12 @@ fn main() -> Res<()> {
                 BasicMode::Run => {
                     basic::run(&spec, &output)?;
                 },
-                BasicMode::PrintCalls(PrintCallsSpec{ target }) => {
+                BasicMode::PrintCalls(PrintCallsSpec{ 
+                    target,
+                    length,
+                    offset,
+                    step,
+                }) => {
                     let dummy_output = DummyWrite {};
 
                     let func = match target {
@@ -686,12 +691,11 @@ fn main() -> Res<()> {
                             },
                     };
 
-                    let mut x = 0.0;
-
-                    let step = 1./64.;
+                    let mut x = offset;
+                    let end = offset + length;
 
                     writeln!(&output, "[")?;
-                    while x <= 1. {
+                    while x <= end {
                         let y: f32 = func([x]);
 
                         writeln!(&output, "    ({x}, {y}),")?;
@@ -700,7 +704,11 @@ fn main() -> Res<()> {
                     }
                     writeln!(&output, "]")?;
                 },
-                BasicMode::Search(ref target) => {
+                BasicMode::Search(SearchSpec {
+                    ref target,
+                    length,
+                    offset,
+                }) => {
                     use minimize::{Call, minimize, regular_simplex_centered_at};
 
                     let dummy_output = DummyWrite {};
@@ -734,11 +742,11 @@ fn main() -> Res<()> {
                                     ).map(|o| o.performance)
                                     .unwrap_or(basic::Performance::MAX) as _
                                 },
-                                [ 0.5 ]
+                                [ offset + length ]
                             ),
                     };
 
-                    let simplex = regular_simplex_centered_at(0.5, center);
+                    let simplex = regular_simplex_centered_at(length, center);
 
                     writeln!(&output, "simplex: {simplex:#?},")?;
 
