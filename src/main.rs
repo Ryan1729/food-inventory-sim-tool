@@ -168,16 +168,30 @@ mod basic {
                         });
                     } else {
                         let remaining_grams = grams - food.grams;
+                        let food = study.shelf.swap_remove(index.0);
+
+                        // Go check for more of the same thing
+                        if let Some(new_index) = study.shelf.iter().position(|f| f.key == food.key) {
+                            tracking_steps.push(TrackingStep::Ate {
+                                eaten: food.grams,
+                                key: food.key.clone(),
+                                out_count: 0,
+                                servings_count: calc_servings_count(food_types, &food.key, food.grams),
+                            });
+
+                            eat_at(study, tracking_steps, ShelfIndex(new_index), remaining_grams, food_types);
+
+                            return
+                        }
+
+                        // Ran out; pick an alternate
                         tracking_steps.push(TrackingStep::Ate {
                             eaten: food.grams,
                             key: food.key.clone(),
                             out_count: remaining_grams,
-                            servings_count: calc_servings_count(food_types, &food.key, grams),
+                            servings_count: calc_servings_count(food_types, &food.key, food.grams),
                         });
                         study.perf.out_count += remaining_grams;
-                        food.grams = 0;
-
-                        study.shelf.swap_remove(index.0);
 
                         // TODO? Allow configuring this? Make random an option?
                         let arbitrary_index = ShelfIndex(0);
@@ -653,7 +667,7 @@ fn main() -> Res<()> {
                 BasicMode::Run => {
                     basic::run(&spec, &output)?;
                 },
-                BasicMode::PrintCalls(PrintCallsSpec{ 
+                BasicMode::PrintCalls(PrintCallsSpec{
                     target,
                     length,
                     offset,
