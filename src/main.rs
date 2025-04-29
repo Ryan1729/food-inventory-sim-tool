@@ -144,6 +144,45 @@ mod basic {
 
         match event {
             Event::Ate(key, grams, .. ) => {
+                fn best_substitute_index(
+                    study: &Shelf,
+                    food_types: &FoodTypes,
+                    key: &food::Key,
+                    // TODO? offset param?
+                ) -> ShelfIndex {
+                    let Some(target_serving_size) =
+                        food_types.iter().find(|f| &f.key == key).map(|f| f.serving) else {
+                        return ShelfIndex(0);
+                    };
+
+                    // Favour items with a similar serving size, as a hueristic for similarity.
+                    // TODO? Some kind of category system to define acceptable substitutes?
+
+                    let mut best_index = 0;
+                    let mut best_difference = Grams::MAX;
+
+                    for i in 0..study.shelf.len() {
+                        let candidate_key = &study.shelf[i].key;
+
+                        for food in food_types {
+                            if candidate_key == &food.key && &food.key != key {
+                                let serving_size = food.serving;
+
+                                let difference = target_serving_size.abs_diff(serving_size);
+
+                                if difference < best_difference {
+                                    best_difference = difference;
+                                    best_index = i;
+                                }
+
+                                break
+                            }
+                        }
+                    }
+
+                    ShelfIndex(best_index)
+                }
+
                 fn eat_at(
                     study: &mut Shelf,
                     tracking_steps: &mut Vec<TrackingStep>,
@@ -194,9 +233,9 @@ mod basic {
                         study.perf.out_count += remaining_grams;
 
                         // TODO? Allow configuring this? Make random an option?
-                        let arbitrary_index = ShelfIndex(0);
+                        let substitute_index = best_substitute_index(study, food_types, &food.key);
 
-                        eat_at(study, tracking_steps, arbitrary_index, remaining_grams, food_types);
+                        eat_at(study, tracking_steps, substitute_index, remaining_grams, food_types);
                     }
                 }
 
@@ -206,9 +245,9 @@ mod basic {
                     study.perf.out_count += grams;
 
                     // TODO? Allow configuring this? Make random an option?
-                    let arbitrary_index = ShelfIndex(0);
+                    let substitute_index = best_substitute_index(study, food_types, &key);
 
-                    eat_at(study, tracking_steps, arbitrary_index, grams, food_types);
+                    eat_at(study, tracking_steps, substitute_index, grams, food_types);
                 }
             },
             Event::Bought(food) => {
