@@ -117,14 +117,43 @@ mod basic {
         food_types: &FoodTypes,
         event: Event
     ) {
+        const SMALL_NUMBER_OF_SERVINGS: food::GramsSizedType = 5;
+
         macro_rules! buy {
             ($food: expr) => {
                 // TODO handle money when that is implemented
 
-                let food = $food;
+                let food: crate::basic::Food = $food;
 
-                tracking_steps.push(TrackingStep::Bought(food.grams, food.key.clone()));
-                study.shelf.push(food);
+                // Buy more if all options are a small number of servings.
+                // TODO? Make this configurable? As in a way to go back to only one serving always?
+                //       This woudl make accurately applying the algorithm in real life easier.
+                let mut serving = food::default_serving();
+                for type_ in food_types {
+                    if type_.key == food.key {
+                        serving = type_.serving;
+                    }
+                }
+
+                if serving == 0 {
+                    serving = food::default_serving();
+                }
+
+                let servings_per_pack: food::GramsSizedType = food.option.grams / serving;
+
+                let mut servings_bought = 0;
+
+                while {
+                    tracking_steps.push(TrackingStep::Bought(food.grams, food.key.clone()));
+                    // TODO? I guess we could probably do some math to eliminate the last
+                    // clone? That would help in the common case of there being enough
+                    // servings in one pack.
+                    study.shelf.push(food.clone());
+
+                    servings_bought += servings_per_pack;
+
+                    servings_bought < SMALL_NUMBER_OF_SERVINGS
+                } {}
             }
         }
 
@@ -211,6 +240,7 @@ mod basic {
 
                         // Go check for more of the same thing
                         if let Some(new_index) = study.shelf.iter().position(|f| f.key == food.key) {
+                            // TODO? track recursion depth so display can indent?
                             tracking_steps.push(TrackingStep::Ate {
                                 eaten: food.grams,
                                 key: food.key.clone(),
@@ -409,6 +439,8 @@ mod basic {
         }
 
         // TODO more realistic hunger model with meals
+
+        // TODO? Label certain foods as once-per-day? Or maybe some generalization of that, like n times per period
 
         fn fixed_servings_amount<F: FnMut(Event)>(
             EventSourceBundle {

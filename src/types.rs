@@ -148,6 +148,8 @@ pub mod food {
 
     // 64k grams ought to be enough for anybody!
     pub type Grams = u16;
+    /// For cases where we want somthing the same size as grams but which is not semantically grams.
+    pub type GramsSizedType = Grams;
 
     pub type Key = String;
 
@@ -156,7 +158,7 @@ pub mod food {
         pub grams: Grams,
     }
 
-    const fn default_serving() -> Grams {
+    pub const fn default_serving() -> Grams {
         100
     }
 
