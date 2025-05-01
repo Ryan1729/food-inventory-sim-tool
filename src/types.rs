@@ -19,6 +19,7 @@ pub struct BuyAllBasedOnFullnessParams {
     pub max_count: ShoppingCount,
     pub offset: IndexOffset,
     pub fullness_threshold: FullnessThreshold,
+    pub minimum_purchase_servings: food::Servings,
 }
 
 #[derive(Clone, Debug)]
@@ -150,6 +151,8 @@ pub mod food {
     pub type Grams = u16;
     /// For cases where we want somthing the same size as grams but which is not semantically grams.
     pub type GramsSizedType = Grams;
+
+    pub type Servings = GramsSizedType;
 
     pub type Key = String;
 

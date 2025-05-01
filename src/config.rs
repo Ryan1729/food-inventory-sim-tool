@@ -87,6 +87,8 @@ struct RawEventSourceSpec {
     #[serde(default)]
     pub servings_per_day: ServingsCount,
     #[serde(default)]
+    pub minimum_purchase_servings: ServingsCount,
+    #[serde(default)]
     pub buy_count: u8,
     #[serde(default)]
     pub count: u16,
@@ -264,6 +266,7 @@ pub fn get_spec() -> Res<Spec> {
                                         max_count: e_s_spec.max_count,
                                         offset: e_s_spec.offset,
                                         fullness_threshold: e_s_spec.fullness_threshold,
+                                        minimum_purchase_servings: e_s_spec.minimum_purchase_servings,
                                     })
                                 );
                             },

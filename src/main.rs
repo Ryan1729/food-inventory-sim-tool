@@ -69,11 +69,6 @@ mod basic {
             }
         }
 
-        #[allow(unused)]
-        pub fn is_at_least_this_full(&self, fullness_threshold: FullnessThreshold) -> bool {
-            self.grams as f32 >= (self.option.grams as f32 * fullness_threshold)
-        }
-
         pub fn current_fullness(&self) -> f32 {
             self.grams as f32 / self.option.grams as f32
         }
@@ -117,17 +112,13 @@ mod basic {
         food_types: &FoodTypes,
         event: Event
     ) {
-        const SMALL_NUMBER_OF_SERVINGS: food::GramsSizedType = 5;
-
         macro_rules! buy {
-            ($food: expr) => {
+            ($food: expr, $minimum_purchase_servings: expr) => {
                 // TODO handle money when that is implemented
 
                 let food: crate::basic::Food = $food;
 
-                // Buy more if all options are a small number of servings.
-                // TODO? Make this configurable? As in a way to go back to only one serving always?
-                //       This woudl make accurately applying the algorithm in real life easier.
+                // Buy more if one is below the configured minimum number of servings.
                 let mut serving = food::default_serving();
                 for type_ in food_types {
                     if type_.key == food.key {
@@ -141,6 +132,8 @@ mod basic {
 
                 let servings_per_pack: food::GramsSizedType = food.option.grams / serving;
 
+                let minimum_purchase_servings = $minimum_purchase_servings;
+                dbg!(minimum_purchase_servings);
                 let mut servings_bought = 0;
 
                 while {
@@ -152,7 +145,7 @@ mod basic {
 
                     servings_bought += servings_per_pack;
 
-                    servings_bought < SMALL_NUMBER_OF_SERVINGS
+                    servings_bought < minimum_purchase_servings
                 } {}
             }
         }
@@ -280,14 +273,15 @@ mod basic {
                     eat_at(study, tracking_steps, substitute_index, grams, food_types);
                 }
             },
-            Event::Bought(food) => {
-                buy!(food);
+            Event::Bought(food, minimum_purchase_servings) => {
+                buy!(food, minimum_purchase_servings);
             }
             Event::BuyAllBasedOnFullness(
                 BuyAllBasedOnFullnessParams {
                     max_count,
                     offset,
-                    fullness_threshold
+                    fullness_threshold,
+                    minimum_purchase_servings,
                 }
             ) => {
                 // buy one of each kind of food if there isn't a more than fullness_threshold full version of it there.
@@ -300,13 +294,14 @@ mod basic {
                     for i in 0..study.shelf.len() {
                         let food = &study.shelf[(i + offset) % study.shelf.len()];
                         if type_.key == food.key {
+                            // TODO account for minimum_purchase_servings when calculating fullness
                             total_fullness += food.current_fullness();
                             break
                         }
                     }
-
+                    dbg!(&type_.key, total_fullness ,fullness_threshold , count, max_count);
                     if total_fullness < fullness_threshold && count < max_count {
-                        buy!(Food::from_rng_of_type(&type_, rng));
+                        buy!(Food::from_rng_of_type(&type_, rng), minimum_purchase_servings);
                         count += 1;
                     }
                 }
@@ -338,14 +333,14 @@ mod basic {
     #[derive(Clone, Debug)]
     enum Event {
         Ate(food::Key, Grams),
-        Bought(Food),
+        Bought(Food, food::Servings),
         BuyAllBasedOnFullness(BuyAllBasedOnFullnessParams)
     }
 
     impl Event {
         fn from_rng(food_types: &FoodTypes, rng: &mut Xs) -> Self {
             match xs::range(rng, 0..2 as u32) {
-                1 => Self::Bought(Food::from_rng(food_types, rng)),
+                1 => Self::Bought(Food::from_rng(food_types, rng), 0),
                 _ => {
                     let food = Food::from_rng(food_types, rng);
                     Self::Ate(food.key, food.grams)
@@ -420,6 +415,7 @@ mod basic {
                 max_count: params.max_count,
                 offset: params.offset,
                 fullness_threshold: 0.5,
+                minimum_purchase_servings: 0,
             }));
         }
 
@@ -434,7 +430,10 @@ mod basic {
         ) {
             for i in 0..*count {
                 let index = (i as usize).wrapping_add(*offset) % food_types.len();
-                push_event(Event::Bought(Food::from_rng_of_type(&food_types[index], rng)));
+                push_event(Event::Bought(
+                    Food::from_rng_of_type(&food_types[index], rng),
+                    0,
+                ));
             }
         }
 
@@ -519,7 +518,10 @@ mod basic {
                     // Go shopping
                     // TODO Count grams and buy a set amount of grams instead of an item count?
                     for _ in 0..*buy_count {
-                        push_event(Event::Bought(Food::from_rng(food_types, rng)));
+                        push_event(Event::Bought(
+                            Food::from_rng(food_types, rng),
+                            0,
+                        ));
                     }
                 },
                 _ => {
