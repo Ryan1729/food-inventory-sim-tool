@@ -69,8 +69,24 @@ mod basic {
             }
         }
 
-        pub fn current_fullness(&self) -> f32 {
-            self.grams as f32 / self.option.grams as f32
+        pub fn current_fullness(
+            &self,
+            minimum_purchase_servings: food::Servings,
+            servings_per_pack: food::Servings, // TODO? NonZeroServings?
+        ) -> f32 {
+            // Say minimum_purchase_servings is 7, and servings_per_pack is 4.
+            // We want to buy 2 servings because we need 2 4s to make at least 7.
+            // 7 / 4 = 1 (integer division) so we add one to make 2.
+            // this also works out with minimum_purchase_servings = 0.
+            let pack_count = if servings_per_pack == 0 {
+                1
+            } else {
+                (minimum_purchase_servings / servings_per_pack) + 1
+            };
+
+            let denominator = self.option.grams * pack_count;
+
+            self.grams as f32 / denominator as f32
         }
     }
 
@@ -112,6 +128,13 @@ mod basic {
         food_types: &FoodTypes,
         event: Event
     ) {
+        macro_rules! calc_servings_per_pack {
+            ($food: expr, $serving: expr) => ({
+                let servings_per_pack: food::GramsSizedType = $food.option.grams / $serving;
+                servings_per_pack
+            })
+        }
+
         macro_rules! buy {
             ($food: expr, $minimum_purchase_servings: expr) => {
                 // TODO handle money when that is implemented
@@ -130,10 +153,10 @@ mod basic {
                     serving = food::default_serving();
                 }
 
-                let servings_per_pack: food::GramsSizedType = food.option.grams / serving;
+                let servings_per_pack: food::GramsSizedType = calc_servings_per_pack!(food, serving);
 
                 let minimum_purchase_servings = $minimum_purchase_servings;
-                dbg!(minimum_purchase_servings);
+
                 let mut servings_bought = 0;
 
                 while {
@@ -294,12 +317,13 @@ mod basic {
                     for i in 0..study.shelf.len() {
                         let food = &study.shelf[(i + offset) % study.shelf.len()];
                         if type_.key == food.key {
-                            // TODO account for minimum_purchase_servings when calculating fullness
-                            total_fullness += food.current_fullness();
+                            let servings_per_pack: food::GramsSizedType = calc_servings_per_pack!(food, type_.serving);
+
+                            total_fullness += food.current_fullness(minimum_purchase_servings, servings_per_pack);
                             break
                         }
                     }
-                    dbg!(&type_.key, total_fullness ,fullness_threshold , count, max_count);
+
                     if total_fullness < fullness_threshold && count < max_count {
                         buy!(Food::from_rng_of_type(&type_, rng), minimum_purchase_servings);
                         count += 1;
