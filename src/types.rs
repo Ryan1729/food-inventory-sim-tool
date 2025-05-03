@@ -7,9 +7,6 @@ pub type FoodTypes = Vec1<food::Type>;
 /// 64k items in one trip ought to be enough for anybody!
 pub type ShoppingCount = u16;
 
-/// 64k servings per day ought to be enough for anybody!
-pub type ServingsCount = u16;
-
 pub type IndexOffset = usize;
 
 pub type FullnessThreshold = f32;
@@ -41,7 +38,7 @@ pub struct FixedHungerAmountParams {
 
 #[derive(Clone, Debug)]
 pub struct FixedServingsAmountParams {
-    pub servings_per_day: ServingsCount,
+    pub servings_per_day: food::Servings,
 }
 
 /// One past max value of a die to roll from 0 to. So a value of 6 indicates a roll between 6 values from
@@ -149,10 +146,14 @@ pub mod food {
 
     // 64k grams ought to be enough for anybody!
     pub type Grams = u16;
+    pub type NonZeroGrams = std::num::NonZeroU16;
     /// For cases where we want somthing the same size as grams but which is not semantically grams.
     pub type GramsSizedType = Grams;
+    pub type NonZeroGramsSizedType = NonZeroGrams;
 
     pub type Servings = GramsSizedType;
+
+    pub type NonZeroServings = NonZeroGramsSizedType;
 
     pub type Key = String;
 
@@ -161,8 +162,11 @@ pub mod food {
         pub grams: Grams,
     }
 
-    pub const fn default_serving() -> Grams {
-        100
+    pub const fn default_serving() -> NonZeroGrams {
+        match NonZeroGrams::new(100) {
+            Some(n) => n,
+            None => NonZeroGrams::MIN
+        }
     }
 
     #[derive(Clone, Debug, serde::Deserialize)]
@@ -170,7 +174,7 @@ pub mod food {
         pub key: Key,
         pub options: Vec1<Option>,
         #[serde(default = "default_serving")]
-        pub serving: Grams,
+        pub serving: NonZeroGrams,
     }
 }
 

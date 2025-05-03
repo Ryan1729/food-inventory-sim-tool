@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicMode, BasicExtras, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, SearchSpec, ServingsCount, Spec, Target};
+use crate::types::{self, food, BasicMode, BasicExtras, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, SearchSpec, Spec, Target};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -85,9 +85,9 @@ struct RawEventSourceSpec {
     #[serde(default)]
     pub grams_per_day: food::Grams,
     #[serde(default)]
-    pub servings_per_day: ServingsCount,
+    pub servings_per_day: food::Servings,
     #[serde(default)]
-    pub minimum_purchase_servings: ServingsCount,
+    pub minimum_purchase_servings: food::Servings,
     #[serde(default)]
     pub buy_count: u8,
     #[serde(default)]

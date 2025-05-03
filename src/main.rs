@@ -72,17 +72,13 @@ mod basic {
         pub fn current_fullness(
             &self,
             minimum_purchase_servings: food::Servings,
-            servings_per_pack: food::Servings, // TODO? NonZeroServings?
+            servings_per_pack: food::NonZeroServings,
         ) -> f32 {
             // Say minimum_purchase_servings is 7, and servings_per_pack is 4.
             // We want to buy 2 servings because we need 2 4s to make at least 7.
             // 7 / 4 = 1 (integer division) so we add one to make 2.
             // this also works out with minimum_purchase_servings = 0.
-            let pack_count = if servings_per_pack == 0 {
-                1
-            } else {
-                (minimum_purchase_servings / servings_per_pack) + 1
-            };
+            let pack_count = (minimum_purchase_servings / servings_per_pack.get()) + 1;
 
             let denominator = self.option.grams * pack_count;
 
@@ -130,8 +126,9 @@ mod basic {
     ) {
         macro_rules! calc_servings_per_pack {
             ($food: expr, $serving: expr) => ({
-                let servings_per_pack: food::GramsSizedType = $food.option.grams / $serving;
-                servings_per_pack
+                let serving: food::NonZeroGrams = $serving;
+                let servings_per_pack: food::GramsSizedType = $food.option.grams / serving;
+                food::NonZeroServings::try_from(servings_per_pack).unwrap_or(food::NonZeroServings::MIN)
             })
         }
 
@@ -149,11 +146,7 @@ mod basic {
                     }
                 }
 
-                if serving == 0 {
-                    serving = food::default_serving();
-                }
-
-                let servings_per_pack: food::GramsSizedType = calc_servings_per_pack!(food, serving);
+                let servings_per_pack: food::NonZeroServings = calc_servings_per_pack!(food, serving);
 
                 let minimum_purchase_servings = $minimum_purchase_servings;
 
@@ -166,7 +159,7 @@ mod basic {
                     // servings in one pack.
                     study.shelf.push(food.clone());
 
-                    servings_bought += servings_per_pack;
+                    servings_bought += servings_per_pack.get();
 
                     servings_bought < minimum_purchase_servings
                 } {}
@@ -182,7 +175,7 @@ mod basic {
         ) -> f32 {
             food_types.iter().find(|type_| &type_.key == key)
                 .map(|type_| {
-                    grams as f32 / type_.serving as f32
+                    grams as f32 / type_.serving.get() as f32
                 })
                 .unwrap_or(-f32::INFINITY)
         }
@@ -213,7 +206,7 @@ mod basic {
                             if candidate_key == &food.key && &food.key != key {
                                 let serving_size = food.serving;
 
-                                let difference = target_serving_size.abs_diff(serving_size);
+                                let difference = target_serving_size.get().abs_diff(serving_size.get());
 
                                 if difference < best_difference {
                                     best_difference = difference;
@@ -317,7 +310,7 @@ mod basic {
                     for i in 0..study.shelf.len() {
                         let food = &study.shelf[(i + offset) % study.shelf.len()];
                         if type_.key == food.key {
-                            let servings_per_pack: food::GramsSizedType = calc_servings_per_pack!(food, type_.serving);
+                            let servings_per_pack: food::NonZeroServings = calc_servings_per_pack!(food, type_.serving);
 
                             total_fullness += food.current_fullness(minimum_purchase_servings, servings_per_pack);
                             break
@@ -485,7 +478,7 @@ mod basic {
                 // At least one serving, and as much as four.
                 let servings_count = 1. + xs::gaussian_zero_to_one(rng, &mut g_state) * 3.;
 
-                let serving_grams = type_.serving;
+                let serving_grams = type_.serving.get();
 
                 let amount =
                     (servings_count * serving_grams as f32) as food::Grams;
