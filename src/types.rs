@@ -2,7 +2,7 @@ use vec1::Vec1;
 
 use std::num::NonZeroU8;
 
-pub type FoodTypes = Vec1<food::Type>; 
+pub type FoodTypes = Vec1<food::Type>;
 
 /// 64k items in one trip ought to be enough for anybody!
 pub type ShoppingCount = u16;
@@ -20,13 +20,13 @@ pub struct BuyAllBasedOnFullnessParams {
 }
 
 #[derive(Clone, Debug)]
-pub struct BuyIfHalfEmptyParams { 
+pub struct BuyIfHalfEmptyParams {
     pub max_count: ShoppingCount,
     pub offset: IndexOffset,
 }
 
 #[derive(Clone, Debug)]
-pub struct BuyRandomVarietyParams { 
+pub struct BuyRandomVarietyParams {
     pub count: ShoppingCount,
     pub offset: IndexOffset,
 }
@@ -70,12 +70,12 @@ pub struct RandomEventParams {
     pub roll_one_past_max: RollOnePastMax,
 }
 
-macro_rules! ess_def {
+macro_rules! essk_def {
     (
         $($variant: ident ($params: ident) $(,)? )+
     ) => {
         #[derive(Clone, Debug)]
-        pub enum EventSourceSpec {
+        pub enum EventSourceSpecKind {
             $( $variant($params), )+
         }
 
@@ -86,7 +86,7 @@ macro_rules! ess_def {
     }
 }
 
-ess_def!{
+essk_def!{
     BuyIfBelowThreshold(BuyAllBasedOnFullnessParams),
     BuyIfHalfEmpty(BuyIfHalfEmptyParams),
     BuyRandomVariety(BuyRandomVarietyParams),
@@ -94,6 +94,14 @@ ess_def!{
     FixedServingsAmount(FixedServingsAmountParams),
     ShopSomeDays(ShopSomeDaysParams),
     RandomEvent(RandomEventParams),
+}
+
+pub type Recurrence = Vec<u8>;
+
+#[derive(Clone, Debug)]
+pub struct EventSourceSpec {
+    pub kind: EventSourceSpecKind,
+    pub recurrence: Recurrence,
 }
 
 #[derive(Clone, Copy, Debug, Default, serde::Deserialize)]

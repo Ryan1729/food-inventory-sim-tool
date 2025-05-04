@@ -578,27 +578,43 @@ mod basic {
         }
 
         macro_rules! get_events {
-            ($es_specs: expr) => {
+            ($es_specs: expr, $i: expr) => {
+                let i = $i;
+                let chunk_index = i / 7;
+                let bit_index = i % 7;
+
                 for es_spec in $es_specs.iter() {
-                    match es_spec {
-                        EventSourceSpec::BuyIfBelowThreshold(p) => buy_if_below_threshold(b!(), &p),
-                        EventSourceSpec::BuyIfHalfEmpty(p) => buy_if_half_empty(b!(), &p),
-                        EventSourceSpec::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
-                        EventSourceSpec::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),
-                        EventSourceSpec::FixedServingsAmount(p) => fixed_servings_amount(b!(), &p),
-                        EventSourceSpec::ShopSomeDays(p) => shop_some_days(b!(), &p),
-                        EventSourceSpec::RandomEvent(p) => random_event(b!(), &p),
+                    let happens_today = {
+                        // TODO? Avoid needing to loop over the same chunks each day?
+                        //       Or is nth on cycle already optimized?
+                        match es_spec.recurrence.iter().cycle().nth(chunk_index) {
+                            // Must be an empty list. That means always.
+                            None => { true },
+                            Some(chunk) => { ((chunk >> bit_index) & 1) == 1 },
+                        }
+                    };
+
+                    if happens_today {
+                        match &es_spec.kind {
+                            EventSourceSpecKind::BuyIfBelowThreshold(p) => buy_if_below_threshold(b!(), &p),
+                            EventSourceSpecKind::BuyIfHalfEmpty(p) => buy_if_half_empty(b!(), &p),
+                            EventSourceSpecKind::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
+                            EventSourceSpecKind::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),
+                            EventSourceSpecKind::FixedServingsAmount(p) => fixed_servings_amount(b!(), &p),
+                            EventSourceSpecKind::ShopSomeDays(p) => shop_some_days(b!(), &p),
+                            EventSourceSpecKind::RandomEvent(p) => random_event(b!(), &p),
+                        }
                     }
                 }
             }
         }
 
-        get_events!(initial_event_source_specs);
+        get_events!(initial_event_source_specs, 0);
 
         events.push(EventEntry::InitialDayMarker);
 
-        for _ in 0..day_count {
-            get_events!(repeated_event_source_specs);
+        for i in 0..day_count {
+            get_events!(repeated_event_source_specs, i);
 
             events.push(EventEntry::DayMarker);
         }
@@ -740,7 +756,7 @@ impl std::io::Write for DummyWrite {
 
 fn main() -> Res<()> {
     use Mode::*;
-    use crate::types::{BasicExtras, EventSourceSpec, BasicMode, Target};
+    use crate::types::{BasicExtras, EventSourceSpecKind, BasicMode, Target};
 
     use std::io::Write;
 
@@ -772,8 +788,8 @@ fn main() -> Res<()> {
                                 let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
 
                                 for ess in &mut repeated_event_source_specs {
-                                    match ess {
-                                        EventSourceSpec::BuyIfBelowThreshold(params) => {
+                                    match &mut ess.kind {
+                                        EventSourceSpecKind::BuyIfBelowThreshold(params) => {
                                             params.fullness_threshold = x;
                                         }
                                         _ => {}
@@ -825,8 +841,8 @@ fn main() -> Res<()> {
                                     let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
 
                                     for ess in &mut repeated_event_source_specs {
-                                        match ess {
-                                            EventSourceSpec::BuyIfBelowThreshold(params) => {
+                                        match &mut ess.kind {
+                                            EventSourceSpecKind::BuyIfBelowThreshold(params) => {
                                                 params.fullness_threshold = x;
                                             }
                                             _ => {}

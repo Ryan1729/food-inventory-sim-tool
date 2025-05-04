@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicMode, BasicExtras, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Res, RollOnePastMax, Seed, SearchSpec, Spec, Target};
+use crate::types::{self, food, BasicMode, BasicExtras, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Recurrence, Res, RollOnePastMax, Seed, SearchSpec, Spec, Target};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -81,6 +81,8 @@ impl core::fmt::Display for RawMode {
 #[derive(Debug, serde::Deserialize)]
 struct RawEventSourceSpec {
     pub kind: RawEventSourceSpecKind,
+    #[serde(default)]
+    pub recurrence: Recurrence,
     // All of the fields from all of the params
     #[serde(default)]
     pub grams_per_day: food::Grams,
@@ -241,6 +243,7 @@ pub fn get_spec() -> Res<Spec> {
                     for i in 0..specs.len() {
                         use crate::types::{
                             EventSourceSpec as ESS,
+                            EventSourceSpecKind as ESSK,
                             RawEventSourceSpecKind::*
                         };
 
@@ -262,12 +265,15 @@ pub fn get_spec() -> Res<Spec> {
                                 );
 
                                 specs_vec.push(
-                                    ESS::BuyIfBelowThreshold(BuyAllBasedOnFullnessParams {
-                                        max_count: e_s_spec.max_count,
-                                        offset: e_s_spec.offset,
-                                        fullness_threshold: e_s_spec.fullness_threshold,
-                                        minimum_purchase_servings: e_s_spec.minimum_purchase_servings,
-                                    })
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::BuyIfBelowThreshold(BuyAllBasedOnFullnessParams {
+                                            max_count: e_s_spec.max_count,
+                                            offset: e_s_spec.offset,
+                                            fullness_threshold: e_s_spec.fullness_threshold,
+                                            minimum_purchase_servings: e_s_spec.minimum_purchase_servings,
+                                        }),
+                                    },
                                 );
                             },
                             BuyIfHalfEmpty => {
@@ -276,10 +282,13 @@ pub fn get_spec() -> Res<Spec> {
                                 );
 
                                 specs_vec.push(
-                                    ESS::BuyIfHalfEmpty(BuyIfHalfEmptyParams {
-                                        max_count: e_s_spec.max_count,
-                                        offset: e_s_spec.offset,
-                                    })
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::BuyIfHalfEmpty(BuyIfHalfEmptyParams {
+                                            max_count: e_s_spec.max_count,
+                                            offset: e_s_spec.offset,
+                                        }),
+                                    },
                                 );
                             },
                             BuyRandomVariety => {
@@ -288,10 +297,13 @@ pub fn get_spec() -> Res<Spec> {
                                 );
 
                                 specs_vec.push(
-                                    ESS::BuyRandomVariety(BuyRandomVarietyParams {
-                                        count: e_s_spec.count,
-                                        offset: e_s_spec.offset,
-                                    })
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::BuyRandomVariety(BuyRandomVarietyParams {
+                                            count: e_s_spec.count,
+                                            offset: e_s_spec.offset,
+                                        }),
+                                    },
                                 );
                             }
                             FixedHungerAmount => {
@@ -300,9 +312,12 @@ pub fn get_spec() -> Res<Spec> {
                                 );
 
                                 specs_vec.push(
-                                    ESS::FixedHungerAmount(FixedHungerAmountParams {
-                                        grams_per_day: e_s_spec.grams_per_day
-                                    })
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::FixedHungerAmount(FixedHungerAmountParams {
+                                            grams_per_day: e_s_spec.grams_per_day
+                                        }),
+                                    },
                                 );
                             },
                             FixedServingsAmount => {
@@ -311,9 +326,12 @@ pub fn get_spec() -> Res<Spec> {
                                 );
 
                                 specs_vec.push(
-                                    ESS::FixedServingsAmount(FixedServingsAmountParams {
-                                        servings_per_day: e_s_spec.servings_per_day
-                                    })
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::FixedServingsAmount(FixedServingsAmountParams {
+                                            servings_per_day: e_s_spec.servings_per_day
+                                        }),
+                                    },
                                 );
                             },
                             ShopSomeDays => {
@@ -322,10 +340,13 @@ pub fn get_spec() -> Res<Spec> {
                                 );
 
                                 specs_vec.push(
-                                    ESS::ShopSomeDays(ShopSomeDaysParams {
-                                        buy_count: e_s_spec.buy_count,
-                                        roll_one_past_max: e_s_spec.roll_one_past_max,
-                                    })
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::ShopSomeDays(ShopSomeDaysParams {
+                                            buy_count: e_s_spec.buy_count,
+                                            roll_one_past_max: e_s_spec.roll_one_past_max,
+                                        }),
+                                    },
                                 );
                             },
                             RandomEvent => {
@@ -334,9 +355,12 @@ pub fn get_spec() -> Res<Spec> {
                                 );
 
                                 specs_vec.push(
-                                    ESS::RandomEvent(RandomEventParams {
-                                        roll_one_past_max: e_s_spec.roll_one_past_max,
-                                    })
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::RandomEvent(RandomEventParams {
+                                            roll_one_past_max: e_s_spec.roll_one_past_max,
+                                        }),
+                                    },
                                 );
                             },
                         }
