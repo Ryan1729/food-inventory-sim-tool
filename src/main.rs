@@ -769,6 +769,42 @@ fn main() -> Res<()> {
             minimal::run(&spec, &output)?;
         }
         Basic(ref extras) => {
+            let dummy_output = DummyWrite {};
+
+            type BIBTFn = Box<dyn Fn([f32; 1]) -> f32>;
+
+            macro_rules! b_i_b_t_func_expr {
+                (| $x: ident, $params: ident | $code: block) => ({
+                    let spec = spec.clone();
+                    let extras = extras.clone();
+                    Box::new(move |[$x]: [f32; 1]| {
+                        let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
+
+                        for ess in &mut repeated_event_source_specs {
+                            match &mut ess.kind {
+                                EventSourceSpecKind::BuyIfBelowThreshold($params) => {
+                                    $code
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        basic::run(
+                            &Spec {
+                                mode: Basic(BasicExtras {
+                                    mode: BasicMode::Run,
+                                    repeated_event_source_specs,
+                                    ..extras.clone()
+                                }),
+                                ..spec
+                            },
+                            &dummy_output
+                        ).map(|o| o.performance)
+                        .unwrap_or(basic::Performance::MAX) as _
+                    })
+                })
+            }
+
             match extras.mode {
                 BasicMode::Run => {
                     basic::run(&spec, &output)?;
@@ -779,36 +815,20 @@ fn main() -> Res<()> {
                     offset,
                     step,
                 }) => {
-                    let dummy_output = DummyWrite {};
-
-                    let func = match target {
+                    let func: BIBTFn = match target {
                         // TODO add more variants when we have more desired targets
                         Target::BuyIfBelowThresholdFullnessThreshold =>
-                            |[x]: [f32; 1]| {
-                                let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
-
-                                for ess in &mut repeated_event_source_specs {
-                                    match &mut ess.kind {
-                                        EventSourceSpecKind::BuyIfBelowThreshold(params) => {
-                                            params.fullness_threshold = x;
-                                        }
-                                        _ => {}
-                                    }
+                            b_i_b_t_func_expr!(
+                                |x, params| {
+                                    params.fullness_threshold = x;
                                 }
-
-                                basic::run(
-                                    &Spec {
-                                        mode: Basic(BasicExtras {
-                                            mode: BasicMode::Run,
-                                            repeated_event_source_specs,
-                                            ..extras.clone()
-                                        }),
-                                        ..spec
-                                    },
-                                    &dummy_output
-                                ).map(|o| o.performance)
-                                .unwrap_or(basic::Performance::MAX) as _
-                            },
+                            ),
+                        Target::BuyIfBelowThresholdMinimumPurchaseServings =>
+                            b_i_b_t_func_expr!(
+                                |x, params| {
+                                    params.minimum_purchase_servings = x as _;
+                                }
+                            ),
                     };
 
                     let mut x = offset;
@@ -831,38 +851,29 @@ fn main() -> Res<()> {
                 }) => {
                     use minimize::{Call, minimize, regular_simplex_centered_at};
 
-                    let dummy_output = DummyWrite {};
+                    let center_1d = [ offset + length ];
 
-                    let (func, center) = match target {
+                    let (func, center, label): (BIBTFn, [f32; 1], &str) = match target {
                         // TODO add more variants when we have more desired targets
                         Target::BuyIfBelowThresholdFullnessThreshold =>
                             (
-                                |[x]: [f32; 1]| {
-                                    let mut repeated_event_source_specs = extras.repeated_event_source_specs.clone();
-
-                                    for ess in &mut repeated_event_source_specs {
-                                        match &mut ess.kind {
-                                            EventSourceSpecKind::BuyIfBelowThreshold(params) => {
-                                                params.fullness_threshold = x;
-                                            }
-                                            _ => {}
-                                        }
+                                b_i_b_t_func_expr!(
+                                    |x, params| {
+                                        params.fullness_threshold = x;
                                     }
-
-                                    basic::run(
-                                        &Spec {
-                                            mode: Basic(BasicExtras {
-                                                mode: BasicMode::Run,
-                                                repeated_event_source_specs,
-                                                ..extras.clone()
-                                            }),
-                                            ..spec
-                                        },
-                                        &dummy_output
-                                    ).map(|o| o.performance)
-                                    .unwrap_or(basic::Performance::MAX) as _
-                                },
-                                [ offset + length ]
+                                ),
+                                center_1d,
+                                "fullness_threshold",
+                            ),
+                        Target::BuyIfBelowThresholdMinimumPurchaseServings =>
+                            (
+                                b_i_b_t_func_expr!(
+                                    |x, params| {
+                                        params.minimum_purchase_servings = x as _;
+                                    }
+                                ),
+                                center_1d,
+                                "minimum_purchase_servings",
                             ),
                     };
 
@@ -870,13 +881,13 @@ fn main() -> Res<()> {
 
                     writeln!(&output, "simplex: {simplex:#?},")?;
 
-                    let Call { xs: [fullness_threshold], y: performance } = minimize(
+                    let Call { xs: [x_1], y: performance } = minimize(
                         func,
                         simplex,
                         100,
                     );
 
-                    writeln!(&output, "fullness_threshold: {fullness_threshold},")?;
+                    writeln!(&output, "{label}: {x_1},")?;
                     writeln!(&output, "performance (closer to 0 is better): {performance},")?;
                 },
             }

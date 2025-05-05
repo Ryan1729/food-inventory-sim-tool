@@ -107,7 +107,8 @@ pub struct EventSourceSpec {
 #[derive(Clone, Copy, Debug, Default, serde::Deserialize)]
 pub enum Target {
     #[default]
-    BuyIfBelowThresholdFullnessThreshold
+    BuyIfBelowThresholdFullnessThreshold,
+    BuyIfBelowThresholdMinimumPurchaseServings,
 }
 
 #[derive(Clone, Debug)]
@@ -140,7 +141,7 @@ pub struct BasicExtras {
     pub repeated_event_source_specs: Vec1<EventSourceSpec>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub enum Mode {
     #[default]
     Minimal,
@@ -186,7 +187,7 @@ pub mod food {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Spec {
     pub mode: Mode,
     pub seed: Option<Seed>,
