@@ -396,6 +396,8 @@ mod basic {
 
         let mut rng = xs::from_seed(spec.seed.unwrap_or_default());
 
+        // TODO make day count range configurable, including a way to specify a fixed amount of days
+
         let day_count = (xs::range(&mut rng, 1..2) * 7) as usize;
 
         type Events = Vec<EventEntry>;
@@ -490,6 +492,19 @@ mod basic {
 
                 servings_remaining -= servings_count;
             }
+        }
+
+        fn eat_exactly<F: FnMut(Event)>(
+            EventSourceBundle {
+                mut push_event,
+                ..
+            }: EventSourceBundle<F>,
+            EatExactlyParams { key_to_eat, grams_to_eat, }: &EatExactlyParams,
+        ) {
+            push_event(Event::Ate(
+                key_to_eat.clone(),
+                *grams_to_eat,
+            ));
         }
 
         fn fixed_hunger_amount<F: FnMut(Event)>(
@@ -599,6 +614,7 @@ mod basic {
                             EventSourceSpecKind::BuyIfBelowThreshold(p) => buy_if_below_threshold(b!(), &p),
                             EventSourceSpecKind::BuyIfHalfEmpty(p) => buy_if_half_empty(b!(), &p),
                             EventSourceSpecKind::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
+                            EventSourceSpecKind::EatExactly(p) => eat_exactly(b!(), &p),
                             EventSourceSpecKind::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),
                             EventSourceSpecKind::FixedServingsAmount(p) => fixed_servings_amount(b!(), &p),
                             EventSourceSpecKind::ShopSomeDays(p) => shop_some_days(b!(), &p),
@@ -624,21 +640,28 @@ mod basic {
 
         let mut tracking_steps = Vec::with_capacity(16);
 
+        let mut day_number = 0;
+
         let mut daily_ate_total = 0;
         let mut daily_bought_total = 0;
 
-        for event_entry in events {
+        let event_count = events.len();
+
+        for (i, event_entry) in events.drain(..).enumerate() {
             match event_entry {
                 EventEntry::InitialDayMarker => {
                     if spec.show_step_by_step {
                         writeln!(w, "======= Start of the First Day ==========")?;
+                        writeln!(w, "Day {day_number}")?;
                         daily_ate_total = 0;
                         daily_bought_total = 0;
                     }
                 }
                 EventEntry::DayMarker => {
+                    day_number += 1;
                     if spec.show_step_by_step {
                         writeln!(w, "============= End of Day ================")?;
+                        
                         writeln!(w, "Ate: {daily_ate_total}")?;
                         writeln!(w, "Bought: {daily_bought_total}")?;
                         writeln!(w, "Stock:")?;
@@ -648,6 +671,10 @@ mod basic {
                         }
 
                         writeln!(w, "=========================================")?;
+                        if i < event_count - 1 {
+                            writeln!(w, "Day {day_number}")?;
+                        }
+
                         daily_ate_total = 0;
                         daily_bought_total = 0;
                     }
@@ -805,6 +832,9 @@ fn main() -> Res<()> {
                 })
             }
 
+            // TODO A mode or some other way to describe in words the purchase strategy being used.
+            //      This is expected to assist in actually applying it in real life, and also as a 
+            //      measure of complexity.
             match extras.mode {
                 BasicMode::Run => {
                     basic::run(&spec, &output)?;

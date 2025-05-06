@@ -102,6 +102,10 @@ struct RawEventSourceSpec {
     pub roll_one_past_max: RollOnePastMax,
     #[serde(default)]
     pub fullness_threshold: types::FullnessThreshold,
+    #[serde(default)]
+    pub key_to_eat: food::Key,
+    #[serde(default)]
+    pub grams_to_eat: food::Grams,
 }
 
 #[derive(Clone, Debug, Default, serde::Deserialize)]
@@ -250,6 +254,7 @@ pub fn get_spec() -> Res<Spec> {
                         let e_s_spec = &specs[i];
 
                         use crate::types::{
+                            EatExactlyParams,
                             FixedHungerAmountParams,
                             RandomEventParams,
                             ShopSomeDaysParams,
@@ -306,6 +311,21 @@ pub fn get_spec() -> Res<Spec> {
                                     },
                                 );
                             }
+                            EatExactly => {
+                                excess_data_check!(
+                                    specs[i] $error_key : buy_count roll_one_past_max max_count
+                                );
+
+                                specs_vec.push(
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::EatExactly(EatExactlyParams {
+                                            key_to_eat: e_s_spec.key_to_eat.clone(),
+                                            grams_to_eat: e_s_spec.grams_to_eat,
+                                        }),
+                                    },
+                                );
+                            },
                             FixedHungerAmount => {
                                 excess_data_check!(
                                     specs[i] $error_key : buy_count roll_one_past_max max_count
