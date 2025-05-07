@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicMode, BasicExtras, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Recurrence, Res, RollOnePastMax, Seed, SearchSpec, Spec, Target};
+use crate::types::{self, food, BasicMode, BasicExtras, DayCount, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Recurrence, Res, RollOnePastMax, Seed, SearchSpec, Spec, Target};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -129,6 +129,8 @@ struct RawSpec {
     // All modes
     pub mode: RawMode,
     pub seed: Option<Seed>,
+    pub day_count_min: DayCount,
+    pub day_count_one_past_max: DayCount,
     // Basic extras
     #[serde(default)]
     pub food_types: Vec<food::Type>,
@@ -185,7 +187,7 @@ pub fn get_spec() -> Res<Spec> {
             $( spec.$field = unvalidated_spec.$field; )+
         }
     }
-    assign!(seed hide_summary show_grams show_items show_step_by_step);
+    assign!(seed day_count_min day_count_one_past_max hide_summary show_grams show_items show_step_by_step);
 
     spec.mode = match &unvalidated_spec.mode {
         RawMode::Minimal => {

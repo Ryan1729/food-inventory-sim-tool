@@ -396,9 +396,10 @@ mod basic {
 
         let mut rng = xs::from_seed(spec.seed.unwrap_or_default());
 
-        // TODO make day count range configurable, including a way to specify a fixed amount of days
+        let day_count_min = spec.day_count_min as u32;
+        let day_count_one_past_max = spec.day_count_one_past_max as u32;
 
-        let day_count = (xs::range(&mut rng, 1..2) * 7) as usize;
+        let day_count = xs::range(&mut rng, day_count_min..day_count_one_past_max) as usize;
 
         type Events = Vec<EventEntry>;
 

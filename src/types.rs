@@ -7,6 +7,9 @@ pub type FoodTypes = Vec1<food::Type>;
 /// 64k items in one trip ought to be enough for anybody!
 pub type ShoppingCount = u16;
 
+/// 64k days in one go ought to be enough for anybody!
+pub type DayCount = u16;
+
 pub type IndexOffset = usize;
 
 pub type FullnessThreshold = f32;
@@ -198,6 +201,8 @@ pub mod food {
 pub struct Spec {
     pub mode: Mode,
     pub seed: Option<Seed>,
+    pub day_count_min: DayCount,
+    pub day_count_one_past_max: DayCount,
     pub hide_summary: bool,
     pub show_grams: bool,
     pub show_items: bool,
