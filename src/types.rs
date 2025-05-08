@@ -35,6 +35,11 @@ pub struct BuyRandomVarietyParams {
 }
 
 #[derive(Clone, Debug)]
+pub struct BuyNOfEverythingParams {
+    pub n: ShoppingCount,
+}
+
+#[derive(Clone, Debug)]
 pub struct EatExactlyParams {
     pub key_to_eat: food::Key,
     pub grams_to_eat: food::Grams,
@@ -99,6 +104,7 @@ essk_def!{
     BuyIfBelowThreshold(BuyAllBasedOnFullnessParams),
     BuyIfHalfEmpty(BuyIfHalfEmptyParams),
     BuyRandomVariety(BuyRandomVarietyParams),
+    BuyNOfEverything(BuyNOfEverythingParams),
     EatExactly(EatExactlyParams),
     FixedHungerAmount(FixedHungerAmountParams),
     FixedServingsAmount(FixedServingsAmountParams),

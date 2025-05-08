@@ -459,7 +459,12 @@ mod basic {
 
         // TODO more realistic hunger model with meals
 
+        // TODO hunger model, or modifier over all hunger models that tracks what was eaten recently and avoids 
+        //      eating that for a while. Maybe pass down a filtered food_types?
+
         // TODO? Label certain foods as once-per-day? Or maybe some generalization of that, like n times per period
+
+        // TODO purchase model that buys enough that we have n servings of everything
 
         fn fixed_servings_amount<F: FnMut(Event)>(
             EventSourceBundle {
@@ -531,6 +536,26 @@ mod basic {
                 ));
 
                 grams_remaining = grams_remaining.saturating_sub(amount as _);
+            }
+        }
+
+        fn buy_n_of_everything<F: FnMut(Event)>(
+            EventSourceBundle {
+                mut push_event,
+                food_types,
+                ..
+            }: EventSourceBundle<F>,
+            BuyNOfEverythingParams {
+                n,
+            }: &BuyNOfEverythingParams,
+        ) {
+            for type_ in food_types {
+                for _ in 0..*n {
+                    push_event(Event::Bought(
+                        Food::of_type(type_, type_.options[0].clone()),
+                        0,
+                    ));
+                }
             }
         }
 
@@ -615,6 +640,7 @@ mod basic {
                             EventSourceSpecKind::BuyIfBelowThreshold(p) => buy_if_below_threshold(b!(), &p),
                             EventSourceSpecKind::BuyIfHalfEmpty(p) => buy_if_half_empty(b!(), &p),
                             EventSourceSpecKind::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
+                            EventSourceSpecKind::BuyNOfEverything(p) => buy_n_of_everything(b!(), &p),
                             EventSourceSpecKind::EatExactly(p) => eat_exactly(b!(), &p),
                             EventSourceSpecKind::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),
                             EventSourceSpecKind::FixedServingsAmount(p) => fixed_servings_amount(b!(), &p),

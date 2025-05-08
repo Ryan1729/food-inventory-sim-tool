@@ -1,4 +1,4 @@
-use crate::types::{self, food, BasicMode, BasicExtras, DayCount, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Recurrence, Res, RollOnePastMax, Seed, SearchSpec, Spec, Target};
+use crate::types::{self, food, BasicMode, BasicExtras, DayCount, FixedServingsAmountParams, FoodTypes, Mode, PrintCallsSpec, RawEventSourceSpecKind, Recurrence, Res, RollOnePastMax, Seed, SearchSpec, ShoppingCount, Spec, Target};
 use std::collections::HashSet;
 
 xflags::xflags! {
@@ -106,6 +106,8 @@ struct RawEventSourceSpec {
     pub key_to_eat: food::Key,
     #[serde(default)]
     pub grams_to_eat: food::Grams,
+    #[serde(default)]
+    pub n: ShoppingCount,
 }
 
 #[derive(Clone, Debug, Default, serde::Deserialize)]
@@ -263,6 +265,7 @@ pub fn get_spec() -> Res<Spec> {
                             BuyRandomVarietyParams,
                             BuyIfHalfEmptyParams,
                             BuyAllBasedOnFullnessParams,
+                            BuyNOfEverythingParams,
                         };
 
                         match e_s_spec.kind {
@@ -309,6 +312,20 @@ pub fn get_spec() -> Res<Spec> {
                                         kind: ESSK::BuyRandomVariety(BuyRandomVarietyParams {
                                             count: e_s_spec.count,
                                             offset: e_s_spec.offset,
+                                        }),
+                                    },
+                                );
+                            }
+                            BuyNOfEverything => {
+                                excess_data_check!(
+                                    specs[i] $error_key : grams_per_day buy_count roll_one_past_max max_count
+                                );
+
+                                specs_vec.push(
+                                    ESS {
+                                        recurrence: e_s_spec.recurrence.clone(),
+                                        kind: ESSK::BuyNOfEverything(BuyNOfEverythingParams {
+                                            n: e_s_spec.n,
                                         }),
                                     },
                                 );
