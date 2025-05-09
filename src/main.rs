@@ -412,6 +412,7 @@ mod basic {
             push_event: F,
             rng: &'rng mut Xs,
             food_types: &'food_types FoodTypes,
+            recently_eaten_foods: Vec<food::Key>,
         }
 
         fn buy_if_below_threshold<F: FnMut(Event)>(
@@ -470,11 +471,19 @@ mod basic {
             EventSourceBundle {
                 mut push_event,
                 rng,
-                food_types,
+                food_types: full_food_types,
+                recently_eaten_foods,
                 ..
             }: EventSourceBundle<F>,
             FixedServingsAmountParams { servings_per_day }: &FixedServingsAmountParams,
         ) {
+            let food_types = 
+                full_food_types.iter()
+                    .filter(|t| !recently_eaten_foods.contains(&t.key))
+                    .collect::<Vec<_>>()
+                ;
+
+
             let mut g_state = xs::GaussianState::default();
 
             let mut servings_remaining = (*servings_per_day) as f32;
@@ -517,11 +526,18 @@ mod basic {
             EventSourceBundle {
                 mut push_event,
                 rng,
-                food_types,
+                food_types: full_food_types,
+                recently_eaten_foods,
                 ..
             }: EventSourceBundle<F>,
             FixedHungerAmountParams { grams_per_day }: &FixedHungerAmountParams,
         ) {
+            let food_types = 
+                full_food_types.iter()
+                    .filter(|t| !recently_eaten_foods.contains(&t.key))
+                    .collect::<Vec<_>>()
+                ;
+
             let mut grams_remaining = *grams_per_day;
             while grams_remaining > 0 {
                 let index = xs::range(rng, 0..food_types.len() as u32) as usize;
@@ -609,13 +625,42 @@ mod basic {
         }
 
         macro_rules! b {
-            () => {
+            () => ({
+                let mut start_index = events.len().saturating_sub(1);
+
+                while start_index > 0 {
+                    if matches!(
+                        events[start_index],
+                        EventEntry::InitialDayMarker | EventEntry::DayMarker,
+                    ) {
+                        break
+                    }
+                    start_index -= 1;
+                }
+
+                let yesterday_slice = &events[start_index..];
+
+                let mut recently_eaten_foods = Vec::with_capacity(yesterday_slice.len() / 2);
+
+                for event_entry in yesterday_slice {
+                    match event_entry {
+                        EventEntry::Event(Event::Ate(key, _)) => {
+                            recently_eaten_foods.push(key.to_owned());
+                        }
+                        EventEntry::Event(Event::Bought(..)) | EventEntry::Event(Event::BuyAllBasedOnFullness(..)) => {}
+                        EventEntry::InitialDayMarker | EventEntry::DayMarker => {
+                            break
+                        }
+                    }
+                }
+
                 EventSourceBundle {
                     push_event: |e| events.push(EventEntry::Event(e)),
                     rng: &mut rng,
                     food_types: &food_types,
+                    recently_eaten_foods,
                 }
-            }
+            })
         }
 
         macro_rules! get_events {
