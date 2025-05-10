@@ -628,12 +628,14 @@ mod basic {
             () => ({
                 let mut start_index = events.len().saturating_sub(1);
 
-                while start_index > 0 {
+                let mut day_marker_count = 0;
+
+                while start_index > 0 && day_marker_count < 3 {
                     if matches!(
                         events[start_index],
                         EventEntry::InitialDayMarker | EventEntry::DayMarker,
                     ) {
-                        break
+                        day_marker_count += 1;
                     }
                     start_index -= 1;
                 }
