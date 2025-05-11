@@ -40,6 +40,12 @@ pub struct BuyNOfEverythingParams {
 }
 
 #[derive(Clone, Debug)]
+pub struct BuyExactlyParams {
+    pub key_to_buy: food::Key,
+    pub grams_to_buy: food::Grams,
+}
+
+#[derive(Clone, Debug)]
 pub struct EatExactlyParams {
     pub key_to_eat: food::Key,
     pub grams_to_eat: food::Grams,
@@ -99,12 +105,13 @@ macro_rules! essk_def {
         }
     }
 }
-// TODO? BuyExactly just for symmetry?
+
 essk_def!{
     BuyIfBelowThreshold(BuyAllBasedOnFullnessParams),
     BuyIfHalfEmpty(BuyIfHalfEmptyParams),
     BuyRandomVariety(BuyRandomVarietyParams),
     BuyNOfEverything(BuyNOfEverythingParams),
+    BuyExactly(BuyExactlyParams),
     EatExactly(EatExactlyParams),
     FixedHungerAmount(FixedHungerAmountParams),
     FixedServingsAmount(FixedServingsAmountParams),

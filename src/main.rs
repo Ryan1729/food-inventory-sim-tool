@@ -62,8 +62,12 @@ mod basic {
         }
 
         fn of_type(type_: &food::Type, option: food::Option) -> Self {
+            Self::of_key(type_.key.clone(), option)
+        }
+
+        fn of_key(key: food::Key, option: food::Option) -> Self {
             Self {
-                key: type_.key.clone(),
+                key,
                 grams: option.grams, // Full of the current grams
                 option: option,
             }
@@ -522,6 +526,19 @@ mod basic {
             ));
         }
 
+        fn buy_exactly<F: FnMut(Event)>(
+            EventSourceBundle {
+                mut push_event,
+                ..
+            }: EventSourceBundle<F>,
+            BuyExactlyParams { key_to_buy, grams_to_buy, }: &BuyExactlyParams,
+        ) {
+            push_event(Event::Bought(
+                Food::of_key(key_to_buy.clone(), food::Option{ grams: *grams_to_buy }),
+                0,
+            ));
+        }
+
         fn fixed_hunger_amount<F: FnMut(Event)>(
             EventSourceBundle {
                 mut push_event,
@@ -688,6 +705,7 @@ mod basic {
                             EventSourceSpecKind::BuyIfHalfEmpty(p) => buy_if_half_empty(b!(), &p),
                             EventSourceSpecKind::BuyRandomVariety(p) => buy_random_variety(b!(), &p),
                             EventSourceSpecKind::BuyNOfEverything(p) => buy_n_of_everything(b!(), &p),
+                            EventSourceSpecKind::BuyExactly(p) => buy_exactly(b!(), &p),
                             EventSourceSpecKind::EatExactly(p) => eat_exactly(b!(), &p),
                             EventSourceSpecKind::FixedHungerAmount(p) => fixed_hunger_amount(b!(), &p),
                             EventSourceSpecKind::FixedServingsAmount(p) => fixed_servings_amount(b!(), &p),
