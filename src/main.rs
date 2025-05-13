@@ -273,6 +273,7 @@ mod basic {
                             out_count: remaining_grams,
                             servings_count: calc_servings_count(food_types, &food.key, food.grams),
                         });
+
                         study.perf.out_count += remaining_grams;
 
                         // TODO? Allow configuring this? Make random an option?
@@ -285,6 +286,13 @@ mod basic {
                 if let Some(index) = study.shelf.iter().position(|f| f.key == key) {
                     eat_at(study, tracking_steps, ShelfIndex(index), grams, food_types);
                 } else {
+                    tracking_steps.push(TrackingStep::Ate {
+                        eaten: 0,
+                        key: key.clone(),
+                        out_count: grams,
+                        servings_count: 0.0,
+                    });
+
                     study.perf.out_count += grams;
 
                     // TODO? Allow configuring this? Make random an option?
@@ -758,6 +766,7 @@ mod basic {
                         writeln!(w, "Bought: {daily_bought_total}")?;
                         writeln!(w, "Stock:")?;
 
+                        // TODO? sort display of items? Or should the shelf data structure just be ordered?
                         for item in &study.shelf {
                             writeln!(w, "    {}: {}g", item.key, item.grams)?;
                         }
@@ -924,6 +933,8 @@ fn main() -> Res<()> {
                 })
             }
 
+            // TODO A way to do several runs in a row, with the seeds being chained together.
+            //     Compute average performance, etc.
             // TODO A mode or some other way to describe in words the purchase strategy being used.
             //      This is expected to assist in actually applying it in real life, and also as a 
             //      measure of complexity.
